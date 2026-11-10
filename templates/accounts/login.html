@@ -1,0 +1,12 @@
+{% extends "accounts/_auth_base.html" %}{% load i18n %}
+{% block title %}{% translate 'Iniciar sesión' %} · CriterIA{% endblock %}
+{% block heading %}{% translate 'Iniciar sesión' %}{% endblock %}
+{% block content %}
+<form method="post" class="form">{% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  {% include "accounts/_fields.html" %}
+  <button class="btn primary">{% translate 'Entrar' %}</button>
+</form>
+<p class="auth-alt">{% translate '¿No tienes cuenta?' %} <a href="{% url 'accounts:register' %}">{% translate 'Regístrate' %}</a></p>
+<p class="auth-alt"><a href="{% url 'chat:home' %}">{% translate 'Continuar como invitado' %}</a></p>
+{% endblock %}

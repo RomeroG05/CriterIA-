@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% load i18n static %}
+{% block body_class %}page-auth{% endblock %}
+{% block body %}
+<main class="auth">
+  <a class="auth-brand" href="{% url 'chat:home' %}"><img src="{% static 'img/logo.svg' %}" alt="" width="44" height="44"><b>Criter<em>IA</em></b></a>
+  <section class="auth-card">
+    <h1>{% block heading %}{% endblock %}</h1>
+    {% for message in messages %}<p class="form-ok">{{ message }}</p>{% endfor %}
+    {% block content %}{% endblock %}
+  </section>
+  {% include "_lang_switch.html" %}
+</main>
+{% endblock %}

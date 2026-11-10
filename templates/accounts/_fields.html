@@ -1,0 +1,8 @@
+{% if form.non_field_errors %}<div class="form-err" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+{% for field in form %}
+<div class="field{% if field.errors %} has-err{% endif %}">
+  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {{ field }}
+  {% if field.errors %}<div class="form-err">{{ field.errors }}</div>{% elif field.help_text %}<details class="help"><summary>?</summary>{{ field.help_text|safe }}</details>{% endif %}
+</div>
+{% endfor %}

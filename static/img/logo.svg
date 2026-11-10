@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CriterIA">
+  <line x1="32" y1="4" x2="32" y2="13" stroke="#ff7a1a" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="32" cy="5.5" r="4" fill="#ff7a1a"/>
+  <rect x="3" y="24" width="7" height="16" rx="3.5" fill="#2f5bff"/>
+  <rect x="54" y="24" width="7" height="16" rx="3.5" fill="#2f5bff"/>
+  <path d="M20 12h24a13 13 0 0 1 13 13v14a13 13 0 0 1-13 13H27L15 61l1-10.2A13 13 0 0 1 7 39V25a13 13 0 0 1 13-13Z" fill="#2f5bff"/>
+  <circle cx="23.5" cy="29" r="6" fill="#fff"/><circle cx="40.5" cy="29" r="6" fill="#fff"/>
+  <circle cx="24.5" cy="29.5" r="2.8" fill="#111a2e"/><circle cx="41.5" cy="29.5" r="2.8" fill="#111a2e"/>
+  <path d="M24 41c4.6 4 11.4 4 16 0" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+</svg>

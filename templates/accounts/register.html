@@ -1,0 +1,11 @@
+{% extends "accounts/_auth_base.html" %}{% load i18n %}
+{% block title %}{% translate 'Crear cuenta' %} · CriterIA{% endblock %}
+{% block heading %}{% translate 'Crear cuenta' %}{% endblock %}
+{% block content %}
+<p class="auth-lead">{% translate 'Con una cuenta tus conversaciones se guardan en tu historial. Solo tú puedes verlas.' %}</p>
+<form method="post" class="form">{% csrf_token %}
+  {% include "accounts/_fields.html" %}
+  <button class="btn primary">{% translate 'Crear cuenta' %}</button>
+</form>
+<p class="auth-alt">{% translate '¿Ya tienes cuenta?' %} <a href="{% url 'accounts:login' %}">{% translate 'Inicia sesión' %}</a></p>
+{% endblock %}

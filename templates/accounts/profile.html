@@ -1,0 +1,11 @@
+{% extends "accounts/_auth_base.html" %}{% load i18n %}
+{% block title %}{% translate 'Mi perfil' %} · CriterIA{% endblock %}
+{% block heading %}{% translate 'Mi perfil' %}{% endblock %}
+{% block content %}
+<p class="auth-lead">{{ user.email }}</p>
+<form method="post" class="form">{% csrf_token %}
+  {% include "accounts/_fields.html" %}
+  <button class="btn primary">{% translate 'Guardar cambios' %}</button>
+</form>
+<p class="auth-alt"><a href="{% url 'accounts:password_change' %}">{% translate 'Cambiar contraseña' %}</a> · <a href="{% url 'chat:home' %}">{% translate 'Volver al chat' %}</a></p>
+{% endblock %}

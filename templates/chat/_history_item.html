@@ -1,0 +1,5 @@
+{% load i18n %}<div class="hist-item{% if conversation and conversation.id == c.id %} on{% endif %}" data-id="{{ c.id }}">
+  <a href="{% url 'chat:conversation' c.id %}" title="{{ c.title }}">{{ c.title }}</a>
+  <button class="icon-btn on-dark" data-act="rename" aria-label="{% translate 'Renombrar' %}"><svg class="i"><use href="#i-pencil"/></svg></button>
+  <button class="icon-btn on-dark" data-act="delete" aria-label="{% translate 'Eliminar' %}"><svg class="i"><use href="#i-trash-2"/></svg></button>
+</div>

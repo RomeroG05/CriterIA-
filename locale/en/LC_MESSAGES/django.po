@@ -1,0 +1,558 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-09 19:26-0500\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: accounts/forms.py:9
+msgid "Nombres"
+msgstr "First names"
+
+#: accounts/forms.py:10
+msgid "Apellidos"
+msgstr "Last names"
+
+#: accounts/forms.py:19
+msgid "Ya existe una cuenta con este correo."
+msgstr "An account with this email already exists."
+
+#: accounts/forms.py:25 accounts/models.py:37
+msgid "Correo electrónico"
+msgstr "Email"
+
+#: accounts/models.py:30
+msgid "Estudiante"
+msgstr "Student"
+
+#: accounts/models.py:31
+msgid "Periodista"
+msgstr "Journalist"
+
+#: accounts/models.py:32
+msgid "Docente"
+msgstr "Teacher"
+
+#: accounts/models.py:33
+msgid "Investigador/a"
+msgstr "Researcher"
+
+#: accounts/models.py:34
+msgid "Otro"
+msgstr "Other"
+
+#: accounts/models.py:38
+msgid "Institución"
+msgstr "Institution"
+
+#: accounts/models.py:39
+msgid "Perfil"
+msgstr "Profile"
+
+#: accounts/models.py:40 templates/_lang_switch.html:2
+msgid "Idioma"
+msgstr "Language"
+
+#: accounts/views.py:34
+msgid ""
+"Tu cuenta fue creada. Tus conversaciones ahora se guardarán en tu historial."
+msgstr "Your account was created. Your conversations will now be saved in your history."
+
+#: accounts/views.py:44
+msgid "Perfil actualizado."
+msgstr "Profile updated."
+
+#: accounts/views.py:54
+msgid "Contraseña actualizada."
+msgstr "Password updated."
+
+#: chat/views.py:48 templates/chat/app.html:93
+msgid "Conceptos"
+msgstr "Concepts"
+
+#: chat/views.py:49 templates/chat/app.html:94
+msgid "Casos"
+msgstr "Cases"
+
+#: chat/views.py:50 templates/chat/app.html:95
+msgid "Dilemas"
+msgstr "Dilemmas"
+
+#: chat/views.py:51
+msgid "Pregunta por un concepto, principio o término…"
+msgstr "Ask about a concept, principle or term…"
+
+#: chat/views.py:52
+msgid "Escribe una temática o busca un caso…"
+msgstr "Enter a topic or search for a case…"
+
+#: chat/views.py:53
+msgid "Describe la situación o plantea el dilema…"
+msgstr "Describe the situation or pose the dilemma…"
+
+#: chat/views.py:54
+msgid "Analizando tu consulta…"
+msgstr "Analyzing your question…"
+
+#: chat/views.py:55
+msgid "Buscando en los documentos…"
+msgstr "Searching the documents…"
+
+#: chat/views.py:56
+msgid "Redactando la respuesta…"
+msgstr "Writing the answer…"
+
+#: chat/views.py:57
+msgid "Fuentes"
+msgstr "Sources"
+
+#: chat/views.py:58
+msgid "p."
+msgstr "p."
+
+#: chat/views.py:59
+msgid "similitud"
+msgstr "similarity"
+
+#: chat/views.py:60 templates/chat/app.html:137
+msgid "Copiar"
+msgstr "Copy"
+
+#: chat/views.py:61
+msgid "Copiado"
+msgstr "Copied"
+
+#: chat/views.py:62
+msgid "Útil"
+msgstr "Helpful"
+
+#: chat/views.py:63
+msgid "No útil"
+msgstr "Not helpful"
+
+#: chat/views.py:64
+msgid "Generar audio"
+msgstr "Generate audio"
+
+#: chat/views.py:65
+msgid "Generar imagen"
+msgstr "Generate image"
+
+#: chat/views.py:66
+msgid "Generando…"
+msgstr "Generating…"
+
+#: chat/views.py:67
+msgid "Regístrate para generar imagen y audio"
+msgstr "Sign up to generate images and audio"
+
+#: chat/views.py:68
+msgid "La generación con Gemini no está configurada"
+msgstr "Gemini generation is not configured"
+
+#: chat/views.py:69
+msgid "Alcanzaste el límite diario para este recurso"
+msgstr "You reached the daily limit for this resource"
+
+#: chat/views.py:70
+msgid "No se pudo generar el recurso. Inténtalo nuevamente."
+msgstr "The resource could not be generated. Please try again."
+
+#: chat/views.py:71
+msgid "Reintentar"
+msgstr "Retry"
+
+#: chat/views.py:72
+msgid "Respuesta detenida."
+msgstr "Response stopped."
+
+#: chat/views.py:73
+msgid "Idioma detectado"
+msgstr "Detected language"
+
+#: chat/views.py:74
+msgid "Grabando… pulsa para terminar"
+msgstr "Recording… press to finish"
+
+#: chat/views.py:75
+msgid "Transcribiendo…"
+msgstr "Transcribing…"
+
+#: chat/views.py:76
+msgid "No se pudo acceder al micrófono"
+msgstr "Could not access the microphone"
+
+#: chat/views.py:77
+msgid "No se pudo transcribir el audio"
+msgstr "The audio could not be transcribed"
+
+#: chat/views.py:78
+msgid "IA local activa"
+msgstr "Local AI online"
+
+#: chat/views.py:79
+msgid "IA local sin conexión"
+msgstr "Local AI offline"
+
+#: chat/views.py:80
+msgid "documentos"
+msgstr "documents"
+
+#: chat/views.py:81
+msgid "¿Eliminar esta conversación?"
+msgstr "Delete this conversation?"
+
+#: chat/views.py:82
+msgid "Nuevo nombre de la conversación"
+msgstr "New conversation name"
+
+#: chat/views.py:83 chat/views.py:117
+msgid "Hoy"
+msgstr "Today"
+
+#: chat/views.py:84 templates/chat/app.html:124
+msgid "Citar"
+msgstr "Cite"
+
+#: chat/views.py:85
+msgid ""
+"Faltan datos de autor o año en este documento: completa la referencia antes "
+"de usarla."
+msgstr "This document lacks author or year data: complete the reference before using it."
+
+#: chat/views.py:86
+msgid "Cita en el texto"
+msgstr "In-text citation"
+
+#: chat/views.py:87
+msgid "Referencia"
+msgstr "Reference"
+
+#: chat/views.py:88
+#, python-format
+msgid "Explícame el principio de %(name)s en el periodismo con IA"
+msgstr "Explain the principle of %(name)s in AI-assisted journalism"
+
+#: chat/views.py:89
+#, python-format
+msgid "Busca casos relacionados con %(name)s en comunicación y periodismo"
+msgstr "Find cases related to %(name)s in communication and journalism"
+
+#: chat/views.py:90
+#, python-format
+msgid ""
+"Plantea los dilemas éticos relacionados con %(name)s en una redacción que "
+"usa IA"
+msgstr "Set out the ethical dilemmas related to %(name)s in a newsroom that uses AI"
+
+#: chat/views.py:117
+msgid "Ayer"
+msgstr "Yesterday"
+
+#: chat/views.py:117
+msgid "Últimos 7 días"
+msgstr "Last 7 days"
+
+#: chat/views.py:117
+msgid "Anteriores"
+msgstr "Older"
+
+#: chat/views.py:141
+msgid "Veracidad"
+msgstr "Accuracy"
+
+#: chat/views.py:141
+msgid "Transparencia"
+msgstr "Transparency"
+
+#: chat/views.py:141
+msgid "Autoría"
+msgstr "Authorship"
+
+#: chat/views.py:141
+msgid "Privacidad"
+msgstr "Privacy"
+
+#: chat/views.py:141
+msgid "Independencia"
+msgstr "Independence"
+
+#: chat/views.py:141
+msgid "Pluralismo"
+msgstr "Pluralism"
+
+#: chat/views.py:141
+msgid "Responsabilidad"
+msgstr "Accountability"
+
+#: chat/views.py:234
+msgid "Demasiadas consultas. Espera unos minutos."
+msgstr "Too many requests. Please wait a few minutes."
+
+#: chat/views.py:242
+msgid "El mensaje debe tener entre 1 y 2000 caracteres."
+msgstr "The message must be between 1 and 2000 characters."
+
+#: templates/accounts/login.html:2 templates/accounts/login.html:3
+#: templates/chat/app.html:41
+msgid "Iniciar sesión"
+msgstr "Log in"
+
+#: templates/accounts/login.html:8
+msgid "Entrar"
+msgstr "Log in"
+
+#: templates/accounts/login.html:10
+msgid "¿No tienes cuenta?"
+msgstr "Don't have an account?"
+
+#: templates/accounts/login.html:10
+msgid "Regístrate"
+msgstr "Sign up"
+
+#: templates/accounts/login.html:11
+msgid "Continuar como invitado"
+msgstr "Continue as guest"
+
+#: templates/accounts/password_change.html:2
+#: templates/accounts/password_change.html:3 templates/accounts/profile.html:10
+msgid "Cambiar contraseña"
+msgstr "Change password"
+
+#: templates/accounts/password_change.html:7 templates/accounts/profile.html:8
+msgid "Guardar cambios"
+msgstr "Save changes"
+
+#: templates/accounts/password_change.html:9
+msgid "Volver al perfil"
+msgstr "Back to profile"
+
+#: templates/accounts/profile.html:2 templates/accounts/profile.html:3
+msgid "Mi perfil"
+msgstr "My profile"
+
+#: templates/accounts/profile.html:10 templates/pages/_page.html:8
+msgid "Volver al chat"
+msgstr "Back to chat"
+
+#: templates/accounts/register.html:2 templates/accounts/register.html:3
+#: templates/accounts/register.html:8 templates/chat/app.html:40
+msgid "Crear cuenta"
+msgstr "Create account"
+
+#: templates/accounts/register.html:5
+msgid ""
+"Con una cuenta tus conversaciones se guardan en tu historial. Solo tú puedes "
+"verlas."
+msgstr "With an account your conversations are saved in your history. Only you can see them."
+
+#: templates/accounts/register.html:10
+msgid "¿Ya tienes cuenta?"
+msgstr "Already have an account?"
+
+#: templates/accounts/register.html:10
+msgid "Inicia sesión"
+msgstr "Log in"
+
+#: templates/base.html:7
+msgid ""
+"Asistente para explorar dilemas éticos en inteligencia artificial, "
+"comunicación y periodismo."
+msgstr "Assistant for exploring ethical dilemmas in artificial intelligence, communication and journalism."
+
+#: templates/chat/_history_item.html:3
+msgid "Renombrar"
+msgstr "Rename"
+
+#: templates/chat/_history_item.html:4
+msgid "Eliminar"
+msgstr "Delete"
+
+#: templates/chat/app.html:8
+msgid "Menú"
+msgstr "Menu"
+
+#: templates/chat/app.html:14
+msgid "Cerrar menú"
+msgstr "Close menu"
+
+#: templates/chat/app.html:17
+msgid "Nueva consulta"
+msgstr "New question"
+
+#: templates/chat/app.html:20
+msgid "Principios éticos"
+msgstr "Ethical principles"
+
+#: templates/chat/app.html:26 templates/chat/app.html:28
+msgid "Historial"
+msgstr "History"
+
+#: templates/chat/app.html:27
+msgid "Buscar conversación"
+msgstr "Search conversations"
+
+#: templates/chat/app.html:39
+msgid "Estás como invitado."
+msgstr "You are browsing as a guest."
+
+#: templates/chat/app.html:39
+msgid "Crea una cuenta para guardar tu historial y generar imagen y audio."
+msgstr "Create an account to save your history and generate images and audio."
+
+#: templates/chat/app.html:48 templates/corpus/library.html:2
+msgid "Biblioteca"
+msgstr "Library"
+
+#: templates/chat/app.html:49
+msgid "Guía de uso"
+msgstr "User guide"
+
+#: templates/chat/app.html:54
+msgid "Cerrar sesión"
+msgstr "Log out"
+
+#: templates/chat/app.html:59
+msgid "Cambiar tema"
+msgstr "Change theme"
+
+#: templates/chat/app.html:66
+msgid "Abrir menú"
+msgstr "Open menu"
+
+#: templates/chat/app.html:67
+msgid "Dilemas éticos en IA y comunicación"
+msgstr "Ethical dilemmas in AI and communication"
+
+#: templates/chat/app.html:69
+msgid "Exportar"
+msgstr "Export"
+
+#: templates/chat/app.html:76
+msgid "¡Hola! Soy CriterIA"
+msgstr "Hi! I'm CriterIA"
+
+#: templates/chat/app.html:77
+msgid ""
+"Tu asistente para explorar dilemas éticos en inteligencia artificial, "
+"comunicación y periodismo."
+msgstr "Your assistant for exploring ethical dilemmas in artificial intelligence, communication and journalism."
+
+#: templates/chat/app.html:78
+msgid "¿Qué te gustaría hacer hoy?"
+msgstr "What would you like to do today?"
+
+#: templates/chat/app.html:80
+msgid "Consultar conceptos"
+msgstr "Look up concepts"
+
+#: templates/chat/app.html:80
+msgid "Definiciones y principios, con su fuente en los PDF."
+msgstr "Definitions and principles, with their source in the PDFs."
+
+#: templates/chat/app.html:81
+msgid "Explorar casos"
+msgstr "Explore cases"
+
+#: templates/chat/app.html:81
+msgid "Casos documentados, con resumen y fuente."
+msgstr "Documented cases, with summary and source."
+
+#: templates/chat/app.html:82
+msgid "Analizar dilemas"
+msgstr "Analyze dilemmas"
+
+#: templates/chat/app.html:82
+msgid "Principios en tensión, alternativas y consecuencias."
+msgstr "Principles in tension, alternatives and consequences."
+
+#: templates/chat/app.html:90
+msgid "Escribe tu consulta"
+msgstr "Type your question"
+
+#: templates/chat/app.html:92
+msgid "Modo"
+msgstr "Mode"
+
+#: templates/chat/app.html:98
+msgid "Dictar por voz"
+msgstr "Dictate by voice"
+
+#: templates/chat/app.html:99
+msgid "Enviar"
+msgstr "Send"
+
+#: templates/chat/app.html:102
+msgid "Modo invitado: esta conversación no se guarda."
+msgstr "Guest mode: this conversation is not saved."
+
+#: templates/chat/app.html:102
+msgid ""
+"Responde solo con los PDF del corpus y puede equivocarse: verifica siempre "
+"la fuente."
+msgstr "It answers only from the corpus PDFs and can be wrong: always check the source."
+
+#: templates/chat/app.html:106
+msgid "Fuente"
+msgstr "Source"
+
+#: templates/chat/app.html:108
+msgid "Fuente localizada en el corpus"
+msgstr "Source found in the corpus"
+
+#: templates/chat/app.html:109 templates/chat/app.html:132
+msgid "Cerrar"
+msgstr "Close"
+
+#: templates/chat/app.html:112
+msgid "Página anterior"
+msgstr "Previous page"
+
+#: templates/chat/app.html:114
+msgid "Página siguiente"
+msgstr "Next page"
+
+#: templates/chat/app.html:116
+msgid "Reducir"
+msgstr "Zoom out"
+
+#: templates/chat/app.html:117
+msgid "Ampliar"
+msgstr "Zoom in"
+
+#: templates/chat/app.html:125 templates/corpus/library.html:12
+msgid "Abrir PDF"
+msgstr "Open PDF"
+
+#: templates/chat/app.html:132
+msgid "Generar cita"
+msgstr "Generate citation"
+
+#: templates/corpus/library.html:4
+msgid "Biblioteca del corpus"
+msgstr "Corpus library"
+
+#: templates/corpus/library.html:5
+msgid ""
+"Estos son los únicos documentos que el asistente utiliza para responder. No "
+"realiza búsquedas en internet."
+msgstr "These are the only documents the assistant uses to answer. It does not search the internet."
+
+#: templates/corpus/library.html:11
+msgid "páginas"
+msgstr "pages"
+
+#: templates/corpus/library.html:17
+msgid "Todavía no hay documentos indexados."
+msgstr "No documents have been indexed yet."

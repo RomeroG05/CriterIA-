@@ -1,0 +1,19 @@
+{% extends "pages/_page.html" %}{% load i18n %}
+{% block title %}{% translate 'Biblioteca' %} · CriterIA{% endblock %}
+{% block doc %}
+<h1>{% translate 'Biblioteca del corpus' %}</h1>
+<p class="lead">{% translate 'Estos son los únicos documentos que el asistente utiliza para responder. No realiza búsquedas en internet.' %}</p>
+{% if documents %}
+<ul class="lib">
+  {% for d in documents %}
+  <li>
+    <svg class="i"><use href="#i-book-open"/></svg>
+    <div><b>{{ d.title }}</b><small>{% if d.authors %}{{ d.authors }} · {% endif %}{% if d.year %}{{ d.year }} · {% endif %}{{ d.pages }} {% translate 'páginas' %}</small></div>
+    <a class="btn-sm ghost" href="{% url 'corpus:file' d.id %}" target="_blank" rel="noopener">{% translate 'Abrir PDF' %}</a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="notice">{% translate 'Todavía no hay documentos indexados.' %}</p>
+{% endif %}
+{% endblock %}

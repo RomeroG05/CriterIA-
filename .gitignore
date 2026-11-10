@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+db.sqlite3*
+media/
+corpus_pdfs/*
+!corpus_pdfs/.gitkeep
+!corpus_pdfs/metadata.example.csv
+!corpus_pdfs/metadata.csv
+.DS_Store
+.vscode/

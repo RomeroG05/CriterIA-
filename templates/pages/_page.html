@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load i18n static %}
+{% block body_class %}page-doc{% endblock %}
+{% block body %}
+<header class="doc-top">
+  <a class="auth-brand" href="{% url 'chat:home' %}"><img src="{% static 'img/logo.svg' %}" alt="" width="34" height="34"><b>Criter<em>IA</em></b></a>
+  <span class="spacer"></span>
+  {% include "_lang_switch.html" %}
+  <a class="btn-sm primary" href="{% url 'chat:home' %}">{% translate 'Volver al chat' %}</a>
+</header>
+<main class="doc">{% block doc %}{% endblock %}</main>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "pages/_page.html" %}
+{% block title %}User guide · CriterIA{% endblock %}
+{% block doc %}
+<h1>User guide</h1>
+<p class="lead">CriterIA helps you understand and analyze ethical dilemmas about artificial intelligence, communication and journalism. It answers only from the PDF documents in its corpus.</p>
+<h2>1. Start a conversation</h2>
+<ol><li>Choose a mode: <b>Concepts</b>, <b>Cases</b> or <b>Dilemmas</b>.</li><li>Type your question in Spanish, English or Portuguese. The assistant detects the language and replies in it.</li><li>Press <b>Enter</b> to send and <b>Shift + Enter</b> for a new line.</li></ol>
+<h2>2. What each mode does</h2>
+<ul><li><b>Concepts:</b> defines a term or principle and explains its key points.</li><li><b>Cases:</b> presents cases described in the documents, with a summary and the ethical issue.</li><li><b>Dilemmas:</b> identifies the principles in tension, the alternatives and their consequences. It does not decide for you: it gives you elements to decide.</li></ul>
+<h2>3. Check the sources</h2>
+<p>Each statement ends with a number, such as <span class="cite-demo">2</span>. Clicking it opens the exact PDF page with the passage highlighted. From there you can open the document or generate the citation in APA 7, Chicago, MLA, BibTeX or RIS.</p>
+<h2>4. When it cannot answer</h2>
+<ul><li><b>Ambiguous question:</b> it will ask for more details.</li><li><b>Outside its scope:</b> it will remind you which topics it covers.</li><li><b>No evidence in the PDFs:</b> it will say so rather than make up an answer. Try rephrasing.</li><li><b>System error:</b> you will see a notice and a <b>Retry</b> button.</li></ul>
+<h2>5. Voice</h2>
+<p>Press the microphone, speak and press it again to finish. The text appears in the box so you can review it before sending. Transcription runs on the project's server.</p>
+<h2>6. Account and history</h2>
+<p>You can use the chat as a guest, but the conversation is not saved. With an account you get history (search, rename, delete), PDF export, answer feedback and image and audio generation.</p>
+<h2>7. Image and audio</h2>
+<p>Under each grounded answer you can generate an illustration or listen to it as audio. These are created with Gemini from the text of the answer; the content always comes from the PDFs.</p>
+<h2>8. A recommendation</h2>
+<p>The assistant can be wrong. Always check the source before using an answer in your work or in an editorial decision.</p>
+{% endblock %}

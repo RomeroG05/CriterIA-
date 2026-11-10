@@ -1,0 +1,148 @@
+{% extends "base.html" %}{% load i18n static %}
+{% block title %}{% if conversation %}{{ conversation.title }} · {% endif %}CriterIA{% endblock %}
+{% block body_class %}page-app{% endblock %}
+{% block body %}
+<div class="app" id="app">
+  <div class="scrim" id="scrim" hidden></div>
+
+  <aside class="sidebar" id="sidebar" aria-label="{% translate 'Menú' %}">
+    <div class="sb-head">
+      <a class="brand" href="{% url 'chat:home' %}">
+        <img src="{% static 'img/logo.svg' %}" alt="" width="32" height="32">
+        <span class="brand-text"><b>Criter<em>IA</em></b><small>Reto 2026 · UTPL</small></span>
+      </a>
+      <button class="icon-btn on-dark" id="sb-close" aria-label="{% translate 'Cerrar menú' %}"><svg class="i"><use href="#i-panel-left"/></svg></button>
+    </div>
+
+    <a class="btn-new" href="{% url 'chat:home' %}"><svg class="i"><use href="#i-plus"/></svg>{% translate 'Nueva consulta' %}</a>
+
+    <div class="sb-scroll">
+      <p class="sb-label">{% translate 'Principios éticos' %}</p>
+      <div class="chips" id="principles">
+        {% for name in principles %}<button type="button" class="chip on-dark" data-principle="{{ name }}">{{ name }}</button>{% endfor %}
+      </div>
+
+      {% if user.is_authenticated %}
+      <p class="sb-label">{% translate 'Historial' %}</p>
+      <label class="sb-search"><svg class="i"><use href="#i-search"/></svg><input id="hist-search" type="search" placeholder="{% translate 'Buscar conversación' %}" aria-label="{% translate 'Buscar conversación' %}"></label>
+      <nav id="history" aria-label="{% translate 'Historial' %}">
+        {% for group in groups %}
+        <section class="hist-group">
+          <h3>{{ group.label }}</h3>
+          {% for c in group.items %}{% include "chat/_history_item.html" with c=c %}{% endfor %}
+        </section>
+        {% endfor %}
+      </nav>
+      {% else %}
+      <div class="guest-card">
+        <svg class="i"><use href="#i-history"/></svg>
+        <p><b>{% translate 'Estás como invitado.' %}</b> {% translate 'Crea una cuenta para guardar tu historial y generar imagen y audio.' %}</p>
+        <a class="btn-sm primary" href="{% url 'accounts:register' %}">{% translate 'Crear cuenta' %}</a>
+        <a class="btn-sm ghost" href="{% url 'accounts:login' %}">{% translate 'Iniciar sesión' %}</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="sb-foot">
+      <nav class="sb-links">
+        <a href="{% url 'corpus:library' %}"><svg class="i"><use href="#i-book-open"/></svg>{% translate 'Biblioteca' %}</a>
+        <a href="{% url 'chat:guide' %}"><svg class="i"><use href="#i-circle-help"/></svg>{% translate 'Guía de uso' %}</a>
+      </nav>
+      {% if user.is_authenticated %}
+      <div class="user-row">
+        <a class="user" href="{% url 'accounts:profile' %}"><span class="avatar-u">{{ user.initials }}</span><span class="u-name">{{ user.display_name }}</span></a>
+        <form action="{% url 'accounts:logout' %}" method="post">{% csrf_token %}<button class="icon-btn on-dark" aria-label="{% translate 'Cerrar sesión' %}" title="{% translate 'Cerrar sesión' %}"><svg class="i"><use href="#i-log-out"/></svg></button></form>
+      </div>
+      {% endif %}
+      <div class="sb-prefs">
+        {% include "_lang_switch.html" %}
+        <button class="icon-btn on-dark" id="theme" aria-label="{% translate 'Cambiar tema' %}" title="{% translate 'Cambiar tema' %}"><svg class="i"><use href="#i-sun"/></svg></button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn" id="sb-open" aria-label="{% translate 'Abrir menú' %}"><svg class="i"><use href="#i-menu"/></svg></button>
+      <h1 class="top-title" id="top-title">{% if conversation %}{{ conversation.title }}{% else %}{% translate 'Dilemas éticos en IA y comunicación' %}{% endif %}</h1>
+      <span class="status" id="status"><i class="dot"></i><span></span></span>
+      <a class="btn-sm ghost" id="export" {% if not conversation %}hidden{% endif %} {% if conversation %}href="{% url 'chat:export' conversation.id %}"{% endif %}><svg class="i"><use href="#i-file-down"/></svg><span>{% translate 'Exportar' %}</span></a>
+    </header>
+
+    <section class="thread" id="thread" aria-live="polite">
+      <div class="thread-inner" id="messages">
+        <div class="empty" id="empty" {% if conversation %}hidden{% endif %}>
+          <img src="{% static 'img/logo.svg' %}" alt="" width="64" height="64">
+          <h2>{% blocktranslate %}¡Hola! Soy CriterIA{% endblocktranslate %}</h2>
+          <p>{% translate 'Tu asistente para explorar dilemas éticos en inteligencia artificial, comunicación y periodismo.' %}</p>
+          <p class="ask">{% translate '¿Qué te gustaría hacer hoy?' %}</p>
+          <div class="mode-cards">
+            <button type="button" class="mode-card" data-mode="A"><span class="mc-ico a"><svg class="i"><use href="#i-book-open"/></svg></span><b>{% translate 'Consultar conceptos' %}</b><small>{% translate 'Definiciones y principios, con su fuente en los PDF.' %}</small></button>
+            <button type="button" class="mode-card" data-mode="B"><span class="mc-ico b"><svg class="i"><use href="#i-search"/></svg></span><b>{% translate 'Explorar casos' %}</b><small>{% translate 'Casos documentados, con resumen y fuente.' %}</small></button>
+            <button type="button" class="mode-card" data-mode="C"><span class="mc-ico c"><svg class="i"><use href="#i-scale"/></svg></span><b>{% translate 'Analizar dilemas' %}</b><small>{% translate 'Principios en tensión, alternativas y consecuencias.' %}</small></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="composer-wrap">
+      <form class="composer" id="composer">
+        <textarea id="input" rows="1" maxlength="2000" aria-label="{% translate 'Escribe tu consulta' %}"></textarea>
+        <div class="composer-row">
+          <div class="modes" role="radiogroup" aria-label="{% translate 'Modo' %}">
+            <button type="button" role="radio" data-mode="A"><svg class="i"><use href="#i-book-open"/></svg>{% translate 'Conceptos' %}</button>
+            <button type="button" role="radio" data-mode="B"><svg class="i"><use href="#i-search"/></svg>{% translate 'Casos' %}</button>
+            <button type="button" role="radio" data-mode="C"><svg class="i"><use href="#i-scale"/></svg>{% translate 'Dilemas' %}</button>
+          </div>
+          <span class="spacer"></span>
+          <button type="button" class="icon-btn" id="mic" aria-label="{% translate 'Dictar por voz' %}" title="{% translate 'Dictar por voz' %}"><svg class="i"><use href="#i-mic"/></svg></button>
+          <button type="submit" class="send" id="send" aria-label="{% translate 'Enviar' %}"><svg class="i"><use href="#i-send"/></svg></button>
+        </div>
+      </form>
+      <p class="disclaimer">{% if not user.is_authenticated %}<b>{% translate 'Modo invitado: esta conversación no se guarda.' %}</b> {% endif %}{% translate 'Responde solo con los PDF del corpus y puede equivocarse: verifica siempre la fuente.' %}</p>
+    </footer>
+  </main>
+
+  <aside class="viewer" id="viewer" hidden aria-label="{% translate 'Fuente' %}">
+    <header class="v-head">
+      <div class="v-title"><small>{% translate 'Fuente localizada en el corpus' %}</small><b id="v-title"></b></div>
+      <button class="icon-btn" id="v-close" aria-label="{% translate 'Cerrar' %}"><svg class="i"><use href="#i-x"/></svg></button>
+    </header>
+    <div class="v-tools">
+      <button class="icon-btn" id="v-prev" aria-label="{% translate 'Página anterior' %}"><svg class="i"><use href="#i-chevron-left"/></svg></button>
+      <span id="v-page"></span>
+      <button class="icon-btn" id="v-next" aria-label="{% translate 'Página siguiente' %}"><svg class="i"><use href="#i-chevron-right"/></svg></button>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="v-out" aria-label="{% translate 'Reducir' %}"><svg class="i"><use href="#i-zoom-out"/></svg></button>
+      <button class="icon-btn" id="v-in" aria-label="{% translate 'Ampliar' %}"><svg class="i"><use href="#i-zoom-in"/></svg></button>
+    </div>
+    <div class="v-doc" id="v-doc"><div class="v-sheet" id="v-sheet"><img id="v-img" alt=""><div id="v-marks"></div></div></div>
+    <div class="v-info">
+      <blockquote id="v-quote"></blockquote>
+      <p class="v-meta" id="v-meta"></p>
+      <div class="v-actions">
+        <button class="btn-sm primary" id="v-cite"><svg class="i"><use href="#i-quote"/></svg>{% translate 'Citar' %}</button>
+        <a class="btn-sm ghost" id="v-open" target="_blank" rel="noopener"><svg class="i"><use href="#i-external-link"/></svg>{% translate 'Abrir PDF' %}</a>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<dialog class="modal" id="cite-modal" aria-labelledby="cite-h">
+  <header><h2 id="cite-h">{% translate 'Generar cita' %}</h2><button class="icon-btn" id="cite-close" aria-label="{% translate 'Cerrar' %}"><svg class="i"><use href="#i-x"/></svg></button></header>
+  <div class="tabs" id="cite-tabs" role="tablist"></div>
+  <div class="cite-box" id="cite-box"></div>
+  <p class="cite-intext" id="cite-intext"></p>
+  <p class="cite-warn" id="cite-warn" hidden></p>
+  <footer><button class="btn-sm primary" id="cite-copy"><svg class="i"><use href="#i-copy"/></svg><span>{% translate 'Copiar' %}</span></button></footer>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+{% for message in messages %}<div class="flash" data-flash>{{ message }}</div>{% endfor %}
+{{ bootstrap|json_script:"bootstrap" }}
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'vendor/marked.min.js' %}"></script>
+<script src="{% static 'vendor/purify.min.js' %}"></script>
+<script src="{% static 'js/app.js' %}"></script>
+{% endblock %}
