@@ -77,6 +77,15 @@ class SearchTests(TestCase):
         self.assertEqual([hit.text for hit in hits], ["deepfake electoral manipulado"])
         self.assertAlmostEqual(hits[0].similarity, 1.0)
 
+    @override_settings(RAG_KEEP_SIMILARITY=0.4)
+    def test_several_phrasings_keep_the_best_similarity(self):
+        retrieval._cached = None
+        from unittest.mock import patch
+
+        with patch("corpus.retrieval.embed_texts", return_value=np.array([[0, 1, 0], [1, 0, 0]], dtype=np.float32)):
+            hits = retrieval.search(["consent", "consentimiento"])
+        self.assertEqual({hit.text for hit in hits}, {"deepfake electoral manipulado", "privacidad de las fuentes"})
+
     def test_index_rebuilds_when_chunks_change(self):
         first = retrieval.get_index()
         Chunk.objects.last().delete()

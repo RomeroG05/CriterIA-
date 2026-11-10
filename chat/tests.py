@@ -18,7 +18,7 @@ WEAK = Hit(chunk_id=1, document_id=1, page=4, title="Doc", text="texto", similar
 
 
 def run(text="¿Debo avisar a la audiencia si usé inteligencia artificial?", mode="A", intent="consulta", hits=(HIT,), tokens=("### Definición\nHay que informar [1]",)):
-    with patch("chat.pipeline.route", return_value=(intent, text)), \
+    with patch("chat.pipeline.route", return_value=(intent, text, text)), \
          patch("chat.pipeline.retrieval.search", return_value=list(hits)), \
          patch("chat.pipeline.stream_answer", return_value=iter(tokens)) as answer:
         events = list(pipeline.run(text, mode, [], "es"))
@@ -27,12 +27,18 @@ def run(text="¿Debo avisar a la audiencia si usé inteligencia artificial?", mo
 
 class FirstTurnQueryTests(SimpleTestCase):
     def test_first_message_is_not_rewritten_but_followups_are(self):
-        with patch("chat.pipeline.route", return_value=("consulta", "reescrita")), \
+        with patch("chat.pipeline.route", return_value=("consulta", "reescrita", "reescrita")), \
              patch("chat.pipeline.retrieval.search", return_value=[]) as search:
             list(pipeline.run("Pregunta original sobre periodismo y ética", "A", [], "es"))
-            search.assert_called_with("Pregunta original sobre periodismo y ética")
+            search.assert_called_with(["Pregunta original sobre periodismo y ética"])
             list(pipeline.run("¿y sus consecuencias entonces?", "A", [pipeline.Turn("user", "x")], "es"))
-            search.assert_called_with("reescrita")
+            search.assert_called_with(["reescrita"])
+
+    def test_non_spanish_questions_also_search_in_spanish(self):
+        with patch("chat.pipeline.route", return_value=("consulta", "x", "¿Se pueden tratar datos sin consentimiento?")), \
+             patch("chat.pipeline.retrieval.search", return_value=[]) as search:
+            list(pipeline.run("Can personal data be processed without consent in Argentina?", "A", [], "es"))
+        search.assert_called_with(["Can personal data be processed without consent in Argentina?", "¿Se pueden tratar datos sin consentimiento?"])
 
 
 class ShortMessageLanguageTests(SimpleTestCase):
@@ -73,6 +79,37 @@ class FlowTests(SimpleTestCase):
         self.assertEqual(final["status"], "no_evidence")
         self.assertFalse([e for e in events if e["type"] == "token"])
 
+    def test_answer_that_only_says_there_is_no_information_becomes_limitation(self):
+        for text in ("### Definition\nThe provided sources do not contain information about the BBC [1].",
+                     "### Definición\nNo se encuentra información en las fuentes sobre la UNESCO [1].",
+                     "### Definição\nA lei argentina exige consentimento [1]. A LGPD brasileira não é mencionada nas fontes."):
+            self.assertEqual(run(tokens=(text,))[1]["status"], "no_evidence", text)
+
+    def test_more_refusal_phrasings(self):
+        for text in ("### Definición\nNo existe evidencia en las fuentes que mencione una ley ecuatoriana [1].",
+                     "### Definition\nThere is no information about drones in the sources [1]."):
+            self.assertEqual(run(tokens=(text,))[1]["status"], "no_evidence", text)
+
+    def test_foreign_country_or_acronym_absent_from_sources_is_no_evidence(self):
+        argentine = Hit(chunk_id=1, document_id=1, page=3, title="Ley 25.326", text="El tratamiento de datos requiere consentimiento. AFSCA.", similarity=0.8)
+        for question in ("¿Qué sanciones impone la ley mexicana a las noticias falsas?",
+                         "O que diz a LGPD brasileira sobre consentimento?",
+                         "How does the BBC label AI content?"):
+            _, final, answer = run(text=question, hits=(argentine,))
+            self.assertEqual(final["status"], "no_evidence", question)
+            answer.assert_not_called()
+
+    def test_entities_present_in_sources_or_common_are_allowed(self):
+        argentine = Hit(chunk_id=1, document_id=1, page=3, title="Ley 26.522", text="La AFSCA aplica la ley. Unión Europea y Canadá regulan.", similarity=0.8)
+        for question in ("¿Qué funciones tiene la AFSCA?", "¿Qué dice la ley argentina sobre la IA?",
+                         "¿Cómo regula Canadá a las plataformas?", "¿Qué dice el reglamento europeo?",
+                         "QUÉ ES LA LEY DE MEDIOS Y CÓMO SE APLICA"):
+            self.assertEqual(run(text=question, hits=(argentine,), tokens=("Dato [1]",))[1]["status"], "answer", question)
+
+    def test_evidence_gaps_section_does_not_trigger_the_refusal_check(self):
+        answer = "### Dilema\nInformar o no [1].\n### Vacíos de evidencia\nLas fuentes no mencionan sanciones."
+        self.assertEqual(run(tokens=(answer,))[1]["status"], "answer")
+
     def test_no_evidence_skips_the_model(self):
         _, final, answer = run(hits=(WEAK,))
         self.assertEqual(final["status"], "no_evidence")
@@ -108,23 +145,23 @@ class FlowTests(SimpleTestCase):
         client = MagicMock()
         client.chat.return_value = {"message": {"content": "no es json"}}
         with patch("chat.pipeline._client", return_value=client):
-            self.assertEqual(pipeline.route("hola mundo", []), ("consulta", "hola mundo"))
+            self.assertEqual(pipeline.route("hola mundo", []), ("consulta", "hola mundo", ""))
 
     def test_routing_combines_both_readings(self):
         history = [pipeline.Turn("user", "x")]
         table = [
-            (("consulta", "a"), ("fuera_de_dominio", "b"), ("consulta", "b")),  # el historial confunde
-            (("fuera_de_dominio", "a"), ("consulta", "b"), ("consulta", "b")),  # solo se entiende con contexto
-            (("ambigua", "a"), ("consulta", "b"), ("consulta", "b")),  # «¿y sus consecuencias?»
-            (("fuera_de_dominio", "a"), ("fuera_de_dominio", "b"), ("fuera_de_dominio", "b")),
-            (("ambigua", "a"), ("ambigua", "b"), ("ambigua", "b")),
+            (("consulta", "a", "a"), ("fuera_de_dominio", "b", "b"), ("consulta", "b", "b")),  # el historial confunde
+            (("fuera_de_dominio", "a", "a"), ("consulta", "b", "b"), ("consulta", "b", "b")),  # solo se entiende con contexto
+            (("ambigua", "a", "a"), ("consulta", "b", "b"), ("consulta", "b", "b")),  # «¿y sus consecuencias?»
+            (("fuera_de_dominio", "a", "a"), ("fuera_de_dominio", "b", "b"), ("fuera_de_dominio", "b", "b")),
+            (("ambigua", "a", "a"), ("ambigua", "b", "b"), ("ambigua", "b", "b")),
         ]
         for alone, contextual, expected in table:
             with patch("chat.pipeline._classify", side_effect=[alone, contextual]):
                 self.assertEqual(pipeline.route("texto", history), expected)
 
     def test_routing_without_history_uses_a_single_call(self):
-        with patch("chat.pipeline._classify", return_value=("consulta", "a")) as classify:
+        with patch("chat.pipeline._classify", return_value=("consulta", "a", "a")) as classify:
             pipeline.route("texto", [])
         self.assertEqual(classify.call_count, 1)
 
@@ -135,7 +172,7 @@ class FlowTests(SimpleTestCase):
 
 def chat(client, message="¿Debo avisar a la audiencia si usé IA?", **extra):
     with patch("chat.views.pipeline.retrieval.search", return_value=[HIT]), \
-         patch("chat.pipeline.route", return_value=("consulta", message)), \
+         patch("chat.pipeline.route", return_value=("consulta", message, message)), \
          patch("chat.pipeline.stream_answer", return_value=iter(["Informar [1]"])):
         response = client.post(reverse("chat:api_chat"), json.dumps({"message": message, "mode": "C", **extra}), content_type="application/json")
         return [json.loads(line) for line in b"".join(response.streaming_content).decode().splitlines()]

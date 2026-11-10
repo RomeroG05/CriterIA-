@@ -117,7 +117,7 @@ CHUNK_OVERLAP = 40
 RAG_TOP_K = 6
 RAG_MIN_SIMILARITY = float(os.getenv("RAG_MIN_SIMILARITY", "0.50"))
 RAG_KEEP_SIMILARITY = RAG_MIN_SIMILARITY - 0.08  # fragmentos más débiles no llegan al modelo
-RAG_STRONG_SIMILARITY = RAG_MIN_SIMILARITY + 0.12  # evidencia que prevalece sobre el clasificador
+RAG_STRONG_SIMILARITY = RAG_MIN_SIMILARITY + 0.05  # evidencia que prevalece sobre el clasificador
 
 # --- Gemini: solo da formato (imagen/audio) a respuestas ya fundamentadas en los PDF ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

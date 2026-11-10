@@ -99,16 +99,19 @@ def _ranks(scores: np.ndarray, only_positive: bool = False) -> dict[int, int]:
     return {int(position): rank for rank, position in enumerate(order)}
 
 
-def search(query: str, top_k: int | None = None) -> list[Hit]:
-    """Devuelve fragmentos ordenados por relevancia, con su similitud semántica real."""
+def search(query: str | list[str], top_k: int | None = None) -> list[Hit]:
+    """Devuelve fragmentos ordenados por relevancia, con su similitud semántica real.
+
+    Acepta varias formulaciones (p. ej. la pregunta original y su traducción al español)."""
+    queries = [query] if isinstance(query, str) else [q for q in query if q.strip()]
     index = get_index()
     if index is None:
         return []
     top_k = top_k or settings.RAG_TOP_K
-    query_vector = embed_texts([query])[0]
-    dense = index.matrix @ query_vector
+    dense = (index.matrix @ embed_texts(queries).T).max(axis=1)
+    lexical = np.max([index.bm25(q) for q in queries], axis=0)
     fused: dict[int, float] = defaultdict(float)
-    for ranks in (_ranks(dense), _ranks(index.bm25(query), only_positive=True)):
+    for ranks in (_ranks(dense), _ranks(lexical, only_positive=True)):
         for position, rank in ranks.items():
             fused[position] += 1 / (RRF_K + rank)
 
