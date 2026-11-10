@@ -54,6 +54,7 @@ def js_strings() -> dict:
         "analyzing": _("Analizando tu consulta…"),
         "searching": _("Buscando en los documentos…"),
         "writing": _("Redactando la respuesta…"),
+        "translating": _("Traduciendo la respuesta…"),
         "sources": _("Fuentes"),
         "page": _("p."),
         "similarity": _("similitud"),

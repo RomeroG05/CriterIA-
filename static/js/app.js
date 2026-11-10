@@ -201,6 +201,7 @@
   }
 
   function renderFinal(view, data) {
+    view.body.querySelector(".translating")?.remove();
     metaRow(view, data.language, data.status === "answer" ? data.mode : null);
     const notice = NOTICE_ICON[data.status];
     if (notice) {
@@ -307,6 +308,7 @@
           break;
         case "status":
           if (!streamed) showStage(view, event.stage);
+          else if (event.stage === "translating") view.body.append(el("p", "typing translating", `<i></i>${T.translating}`));
           break;
         case "sources":
           sources = event.citations;

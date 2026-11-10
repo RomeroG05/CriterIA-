@@ -556,3 +556,6 @@ msgstr "pages"
 #: templates/corpus/library.html:17
 msgid "Todavía no hay documentos indexados."
 msgstr "No documents have been indexed yet."
+
+msgid "Traduciendo la respuesta…"
+msgstr "Translating the answer…"

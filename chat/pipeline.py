@@ -19,8 +19,10 @@ log = logging.getLogger(__name__)
 
 CITATION_RE = re.compile(r"\[(\d{1,2})\]")
 _REFUSAL = re.compile(
-    r"\b(fuentes|documentos|corpus|sources|documents|fontes)\b[^.\n]{0,80}\b(no|not|não|nao)\b[^.\n]{0,25}"
-    r"(contien|mencion|inclu|abord|proporcion|cubr|contain|mention|includ|address|provid|cover|cont[eê]m|forne)"
+    r"\b(fuentes?|documentos?|textos?|corpus|sources?|documents?|texts?|fontes?)\b[^.\n]{0,80}\b(no|not|não|nao)\b[^.\n]{0,25}"
+    r"(contien|mencion|inclu|abord|proporcion|cubr|defin|describ|explic|trat|habl|refier"
+    r"|contain|mention|includ|address|provid|cover|explain|discuss|talk|refer"
+    r"|cont[eê]m|forne|descrev|fala|trata)"
     r"|\bno (se encuentra|se encontr[oó]|hay|existe)\b[^.\n]{0,30}(informaci[oó]n|evidencia|datos|menci[oó]n|referencia)"
     r"|\b(there is )?no (information|evidence|mention)\b"
     r"|\bnão (há|existe|foi encontrad[ao]|se encontra)\b[^.\n]{0,30}(informa|evid[eê]ncia|men[cç])"
@@ -169,22 +171,47 @@ def validate_answer(text: str, available: int) -> tuple[str, set[int]]:
     return CITATION_RE.sub(keep, text).strip(), used
 
 
-def stream_answer(mode: str, language: str, question: str, hits, history) -> Iterator[str]:
+def stream_answer(mode: str, language: str, question: str, hits) -> Iterator[str]:
+    """Redacta sin el historial: la pregunta ya llega reescrita como autónoma, y con la respuesta
+    anterior delante el modelo tiende a copiarla, incluso en otro idioma."""
     numbered = [(i, h.title, h.page, h.text) for i, h in enumerate(hits, start=1)]
-    messages = [{"role": "system", "content": prompts.answer_system(mode, language)}]
-    messages += [{"role": t.role, "content": t.content} for t in history]
-    messages.append({"role": "user", "content": prompts.answer_user(question, numbered)})
+    messages = [
+        {"role": "system", "content": prompts.answer_system(mode, language)},
+        {"role": "user", "content": prompts.answer_user(question, numbered, language)},
+    ]
     stream = _client().chat(
         model=settings.OLLAMA_CHAT_MODEL,
         think=False,
         stream=True,
         keep_alive="30m",
-        options={"temperature": 0.2, "num_ctx": settings.OLLAMA_NUM_CTX, "num_predict": 1000},
+        # Semilla fija: la misma pregunta con las mismas fuentes recibe siempre la misma respuesta.
+        options={"temperature": 0.2, "seed": 42, "num_ctx": settings.OLLAMA_NUM_CTX, "num_predict": 1000},
         messages=messages,
     )
     for chunk in stream:
         if chunk["message"]["content"]:
             yield chunk["message"]["content"]
+
+
+def in_language(answer: str, language: str) -> bool:
+    plain = re.sub(r"[#*_>`-]+", " ", CITATION_RE.sub("", answer))
+    if len(plain.split()) < 6:  # demasiado corto para juzgar
+        return True
+    return lang_module.dominant(plain) == language
+
+
+def translate_answer(answer: str, language: str) -> str:
+    response = _client().chat(
+        model=settings.OLLAMA_CHAT_MODEL,
+        think=False,
+        keep_alive="30m",
+        options={"temperature": 0, "num_ctx": settings.OLLAMA_NUM_CTX, "num_predict": 1400},
+        messages=[
+            {"role": "system", "content": prompts.TRANSLATE_SYSTEM.format(language=prompts.LANGUAGE_NAME[language])},
+            {"role": "user", "content": answer},
+        ],
+    )
+    return response["message"]["content"]
 
 
 def run(text: str, mode: str, history: list[Turn], fallback_language: str) -> Iterator[dict]:
@@ -244,7 +271,7 @@ def run(text: str, mode: str, history: list[Turn], fallback_language: str) -> It
 
         collected, released = "", False
         hold = len(prompts.NO_EVIDENCE) + 2
-        for token in stream_answer(mode, language, query, hits, history):
+        for token in stream_answer(mode, language, query, hits):
             collected += token
             if not released:
                 if len(collected.lstrip()) < hold and prompts.NO_EVIDENCE.startswith(collected.lstrip()[:len(prompts.NO_EVIDENCE)]):
@@ -257,6 +284,13 @@ def run(text: str, mode: str, history: list[Turn], fallback_language: str) -> It
         if prompts.NO_EVIDENCE in answer or not used or looks_like_refusal(answer):
             yield _final(S.NO_EVIDENCE, texts.RESPONSES["no_evidence"][language], language, mode)
             return
+        if not in_language(answer, language):  # se responde siempre en el idioma de la pregunta
+            yield {"type": "status", "stage": "translating"}
+            translated, translated_used = validate_answer(translate_answer(answer, language), len(hits))
+            if translated_used and in_language(translated, language):
+                answer, used = translated, translated_used
+            else:
+                log.warning("No se pudo traducir la respuesta a %s", language)
         yield _final(S.ANSWER, answer, language, mode, [s for s in sources if s["number"] in used])
     except Exception:
         log.exception("Fallo al procesar la consulta")

@@ -79,6 +79,15 @@ El código está en [`chat/pipeline.py`](chat/pipeline.py).
 python manage.py test
 ```
 
+## Evaluar la calidad de las respuestas
+
+```bash
+python manage.py evaluar                  # una pasada por las preguntas de control
+python manage.py evaluar --repeticiones 3 # comprueba que las respuestas sean estables
+```
+
+Usa el modelo real y las preguntas de `evaluacion/preguntas.csv`. En el grupo `dentro` la respuesta está en el corpus: se espera una respuesta con citas en el idioma de la pregunta. En el grupo `fuera` no lo está: se espera que el asistente diga que no tiene evidencia. Repite la evaluación al añadir PDF o cambiar de modelo, y agrega preguntas propias al CSV.
+
 ## Estructura
 
 ```

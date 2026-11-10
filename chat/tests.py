@@ -54,6 +54,20 @@ class LanguageTests(SimpleTestCase):
         self.assertEqual(language.detect("Should the newsroom disclose that the article was written with AI?"), "en")
         self.assertEqual(language.detect("Devo avisar o público que a matéria foi escrita com ajuda da inteligência artificial?"), "pt")
 
+    def test_short_questions_with_exclusive_marks(self):
+        for text, expected in (("É ético usar IA para automatizar comunicados de imprensa?", "pt"),
+                               ("Como os meios estão usando a inteligência artificial?", "pt"),
+                               ("O que você acha da transparência?", "pt"),
+                               ("¿Es ético usar IA para automatizar gacetillas y refritos?", "es"),
+                               ("¿Qué es la desinformación?", "es"),
+                               ("Trato inhumano a fuentes anheladas", "es"),
+                               ("Is it ethical to use AI to automate press releases?", "en")):
+            self.assertEqual(language.detect(text, "es"), expected, text)
+
+    def test_dominant_language_of_mixed_text(self):
+        mixed = "Definição. El uso de la inteligencia artificial para automatizar comunicados se considera una práctica necesaria que libera tiempo."
+        self.assertEqual(language.dominant(mixed), "es")
+
     def test_short_text_keeps_conversation_language(self):
         self.assertEqual(language.detect("ok", "pt"), "pt")
 
@@ -87,6 +101,9 @@ class FlowTests(SimpleTestCase):
 
     def test_more_refusal_phrasings(self):
         for text in ("### Definición\nNo existe evidencia en las fuentes que mencione una ley ecuatoriana [1].",
+                     "### Definición\nEl documento no define ni describe el concepto de periodismo de soluciones [1].",
+                     "### Definição\nO texto não descreve o jornalismo de soluções [1].",
+                     "### Definition\nThe document does not define solutions journalism [1].",
                      "### Definition\nThere is no information about drones in the sources [1]."):
             self.assertEqual(run(tokens=(text,))[1]["status"], "no_evidence", text)
 
@@ -164,6 +181,37 @@ class FlowTests(SimpleTestCase):
         with patch("chat.pipeline._classify", return_value=("consulta", "a", "a")) as classify:
             pipeline.route("texto", [])
         self.assertEqual(classify.call_count, 1)
+
+    def test_answer_is_written_without_history(self):
+        client = MagicMock()
+        client.chat.return_value = iter([{"message": {"content": "Hola [1]"}}])
+        with patch("chat.pipeline._client", return_value=client):
+            list(pipeline.stream_answer("A", "pt", "Pergunta?", [HIT]))
+        messages = client.chat.call_args.kwargs["messages"]
+        self.assertEqual([m["role"] for m in messages], ["system", "user"])
+        self.assertIn("Portuguese", messages[-1]["content"].splitlines()[-1])
+        self.assertEqual(client.chat.call_args.kwargs["options"]["seed"], 42)
+
+    def test_answer_in_wrong_language_is_translated(self):
+        spanish = "### Definição\nEl uso de la inteligencia artificial para automatizar comunicados se considera una práctica necesaria [1]."
+        portuguese = "### Definição\nO uso da inteligência artificial para automatizar comunicados é considerado uma prática necessária [1]."
+        with patch("chat.pipeline.translate_answer", return_value=portuguese) as translate:
+            events, final, _ = run(text="É ético usar IA para automatizar comunicados de imprensa?", tokens=(spanish,))
+        translate.assert_called_once()
+        self.assertEqual(final["content"], portuguese)
+        self.assertIn({"type": "status", "stage": "translating"}, events)
+
+    def test_answer_in_right_language_is_not_translated(self):
+        with patch("chat.pipeline.translate_answer") as translate:
+            final = run(tokens=("### Definición\nLa transparencia editorial exige informar a la audiencia sobre el uso de herramientas [1].",))[1]
+        translate.assert_not_called()
+        self.assertEqual(final["status"], "answer")
+
+    def test_failed_translation_keeps_the_grounded_answer(self):
+        spanish = "### Definição\nEl uso de la inteligencia artificial para automatizar comunicados se considera una práctica necesaria [1]."
+        with patch("chat.pipeline.translate_answer", return_value="tradução sem citações"):
+            final = run(text="É ético usar IA para automatizar comunicados de imprensa?", tokens=(spanish,))[1]
+        self.assertEqual((final["status"], final["content"]), ("answer", spanish))
 
     def test_history_drops_old_citation_marks(self):
         turns = pipeline.clean_history([pipeline.Turn("assistant", "Dato [3] final")])
