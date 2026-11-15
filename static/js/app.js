@@ -133,9 +133,26 @@
   function renderAsset(view, asset) {
     let box = view.body.querySelector(".assets");
     if (!box) { box = el("div", "assets"); const actions = view.body.querySelector(".actions"); view.body.insertBefore(box, actions); }
-    if (box.querySelector(asset.kind === "image" ? "img" : "audio")) return;
-    if (asset.kind === "image") { const img = el("img"); img.src = asset.url; img.alt = ""; box.append(img); }
-    else { const audio = el("audio"); audio.controls = true; audio.src = asset.url; box.append(audio); }
+    if (box.querySelector(`.asset-item[data-kind="${asset.kind}"]`)) return;
+    const isAudio = asset.kind === "audio";
+    const item = el("div", `asset-item ${isAudio ? "audio" : "image"}`);
+    item.dataset.kind = asset.kind;
+    if (isAudio) { const audio = el("audio"); audio.controls = true; audio.src = asset.url; item.append(audio); }
+    else { const img = el("img"); img.src = asset.url; img.alt = ""; item.append(img); }
+    if (asset.delete_url) {
+      const remove = el("button", "asset-del", icon("trash-2"));
+      remove.type = "button";
+      remove.title = T.removeAsset;
+      remove.setAttribute("aria-label", T.removeAsset);
+      remove.addEventListener("click", async () => {
+        remove.disabled = true;
+        const res = await post(asset.delete_url);
+        if (res.ok) { item.remove(); if (!box.children.length) box.remove(); }
+        else { remove.disabled = false; toast(T.genError); }
+      });
+      item.append(remove);
+    }
+    box.append(item);
   }
 
   function actionButton(name, label, handler) {
@@ -145,10 +162,39 @@
     return button;
   }
 
+  const VISUALS = [["image", "visualInfographic"], ["concept_map", "visualConceptMap"], ["ishikawa", "visualIshikawa"], ["comparison", "visualComparison"]];
+
+  function visualMenuButton(view, messageId) {
+    const wrap = el("div", "visual-wrap");
+    const button = actionButton("image", T.image, () => {
+      if (!boot.authenticated) return toast(T.registerToGenerate);
+      document.querySelectorAll(".visual-menu").forEach((m) => { if (m !== menu) m.hidden = true; });
+      menu.hidden = !menu.hidden;
+    });
+    button.setAttribute("aria-haspopup", "menu");
+    const menu = el("div", "visual-menu");
+    menu.hidden = true;
+    menu.setAttribute("role", "menu");
+    menu.append(el("p", "visual-menu-title", T.visualPrompt));
+    for (const [kind, label] of VISUALS) {
+      const item = el("button");
+      item.type = "button";
+      item.setAttribute("role", "menuitem");
+      item.textContent = T[label];
+      item.addEventListener("click", () => { menu.hidden = true; generateHandler(view, messageId, kind)(button); });
+      menu.append(item);
+    }
+    wrap.append(button, menu);
+    return wrap;
+  }
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".visual-wrap")) document.querySelectorAll(".visual-menu").forEach((m) => (m.hidden = true));
+  });
+
   function generateHandler(view, messageId, kind) {
     return async (button) => {
       if (!boot.authenticated) return toast(T.registerToGenerate);
-      if (!boot.gemini) return toast(T.geminiMissing);
+      if (kind === "image" && !boot.gemini) return toast(T.geminiMissing);
       if (button.classList.contains("spin")) return;
       button.classList.add("spin");
       const svg = button.innerHTML; button.innerHTML = icon("loader-circle");
@@ -157,7 +203,7 @@
         const res = await post(`/api/mensajes/${messageId}/generar/${kind}/`);
         const data = await res.json();
         if (res.ok) renderAsset(view, data);
-        else toast(data.error === "quota" ? T.quota : data.error === "gemini_missing" ? T.geminiMissing : T.genError);
+        else toast(data.error === "quota" ? T.quota : data.error === "gemini_missing" ? T.geminiMissing : data.error === "voice_missing" ? T.voiceMissing : data.error === "image_billing" ? T.imageBilling : data.error === "gemini_busy" ? T.geminiBusy : data.error === "not_enough" ? T.notEnough : T.genError);
       } catch { toast(T.genError); }
       button.classList.remove("spin"); button.innerHTML = svg;
     };
@@ -185,7 +231,7 @@
         actions.append(vote(1, "thumbs-up", T.useful), vote(-1, "thumbs-down", T.notUseful));
     }
     actions.append(actionButton("volume-2", T.audio, generateHandler(view, data.id, "audio")));
-    actions.append(actionButton("image", T.image, generateHandler(view, data.id, "image")));
+    actions.append(visualMenuButton(view, data.id));
     view.body.append(actions);
     (data.assets || []).forEach((asset) => renderAsset(view, asset));
     if (data.suggestions && data.suggestions.length) {
@@ -427,6 +473,7 @@
       catch { return toast(T.micDenied); }
       const chunks = [];
       recorder = new MediaRecorder(stream);
+      const mime = recorder.mimeType || "audio/webm";
       recorder.ondataavailable = (e) => chunks.push(e.data);
       recorder.onstop = async () => {
         clearTimeout(stopTimer);
@@ -437,12 +484,12 @@
         const previous = input.placeholder;
         input.placeholder = T.transcribing;
         const form = new FormData();
-        form.append("audio", new Blob(chunks, { type: "audio/webm" }), "voz.webm");
+        form.append("audio", new Blob(chunks, { type: mime }), mime.includes("ogg") ? "voz.ogg" : "voz.webm");
         try {
           const res = await fetch("/api/voz/", { method: "POST", headers: { "X-CSRFToken": csrf() }, body: form });
           const data = await res.json();
           if (res.ok && data.text) { input.value = (input.value + " " + data.text).trim(); resizeInput(); input.focus(); }
-          else toast(T.voiceError);
+          else toast({ silent: T.voiceSilent, too_short: T.voiceShort, no_speech: T.voiceNoSpeech }[data.error] || T.voiceError);
         } catch { toast(T.voiceError); }
         input.placeholder = previous;
         mic.disabled = false;

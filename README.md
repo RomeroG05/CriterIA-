@@ -8,7 +8,8 @@ Chatbot web para comprender y analizar dilemas éticos sobre inteligencia artifi
 | Modelo de chat | `qwen3.5:4b` en Ollama, 100 % local |
 | Búsqueda en los PDF | `bge-m3` (semántica) + BM25 (léxica) |
 | Voz a texto | `faster-whisper`, local |
-| Imagen y audio | Gemini, opcional |
+| Lectura en voz alta | Piper, local |
+| Recursos visuales | Infografía, mapa conceptual, Ishikawa y cuadro comparativo; locales (Gemini opcional) |
 
 ## Instalación
 
@@ -24,6 +25,7 @@ pip install -r requirements.txt
 cp .env.example .env
 
 python manage.py migrate
+python manage.py descargar_voces   # voces locales para el audio
 python manage.py createsuperuser   # para entrar a /admin/
 ```
 
@@ -51,11 +53,21 @@ Abre <http://127.0.0.1:8000>. La guía para usuarios está en `/guia/`.
 
 La primera vez que se usa el micrófono se descargan unos 500 MB del modelo de voz. El navegador solo permite el micrófono en `localhost` o por HTTPS.
 
-## Imagen y audio con Gemini (opcional)
+## Audio (local)
 
-Añade `GEMINI_API_KEY` en `.env`. Las imágenes no tienen capa gratuita: requieren facturación activa en Google AI Studio. El audio sí tiene capa gratuita.
+El botón de audio lee la respuesta en voz alta con Piper, sin internet, con una voz por idioma (español, inglés y portugués). Las voces ocupan unos 180 MB y se descargan una vez:
 
-Gemini solo convierte en imagen o audio una respuesta ya fundamentada, y no tiene acceso a búsquedas. Hay un límite diario por usuario, configurable en `.env`.
+```bash
+python manage.py descargar_voces
+```
+
+## Imagen
+
+El botón 🖼 ofrece cuatro recursos en PNG: infografía, mapa conceptual, diagrama de Ishikawa y cuadro comparativo. Para los tres últimos, el modelo local reorganiza solo el texto de la respuesta en una estructura y la app la dibuja. Todo es gratis, sin internet, e incluye las fuentes.
+
+Opcionalmente puede usarse una ilustración de Gemini: pon `IMAGE_ENGINE=gemini` y `GEMINI_API_KEY` en `.env`. Las imágenes no tienen capa gratuita: con una clave sin facturación activa en Google AI Studio, la app muestra un aviso en lugar de la imagen.
+
+Gemini solo convierte en imagen una respuesta ya fundamentada y no tiene acceso a búsquedas. Hay un límite diario por usuario (`GEMINI_DAILY_IMAGE_LIMIT`, 5 por defecto).
 
 ## Cómo funciona una consulta
 
@@ -94,7 +106,7 @@ Usa el modelo real y las preguntas de `evaluacion/preguntas.csv`. En el grupo `d
 criteria/   configuración de Django
 accounts/   registro, inicio de sesión y perfil
 corpus/     ingesta de PDF, búsqueda, citas y visor de páginas
-chat/       flujo conversacional, historial, voz, exportación y Gemini
+chat/       flujo conversacional, historial, voz, audio, exportación y Gemini
 locale/     traducciones de la interfaz (en, pt)
 templates/  páginas
 static/     estilos, JavaScript y librerías locales

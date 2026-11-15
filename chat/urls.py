@@ -11,6 +11,7 @@ urlpatterns = [
     path("c/<uuid:pk>/eliminar/", views.conversation_delete, name="delete"),
     path("c/<uuid:pk>/exportar.pdf", views.conversation_export, name="export"),
     path("recurso/<uuid:pk>/", views.asset_file, name="asset"),
+    path("recurso/<uuid:pk>/eliminar/", views.asset_delete, name="asset_delete"),
     path("api/estado/", views.api_status, name="status"),
     path("api/chat/", views.api_chat, name="api_chat"),
     path("api/voz/", views.api_transcribe, name="transcribe"),

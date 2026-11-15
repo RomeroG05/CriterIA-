@@ -146,8 +146,8 @@ msgid "Generar audio"
 msgstr "Gerar áudio"
 
 #: chat/views.py:65
-msgid "Generar imagen"
-msgstr "Gerar imagem"
+msgid "Generar infografía"
+msgstr "Gerar infográfico"
 
 #: chat/views.py:66
 msgid "Generando…"
@@ -559,3 +559,42 @@ msgstr "Ainda não há documentos indexados."
 
 msgid "Traduciendo la respuesta…"
 msgstr "Traduzindo a resposta…"
+
+msgid "Faltan las voces locales: ejecuta python manage.py descargar_voces"
+msgstr "Faltam as vozes locais: execute python manage.py descargar_voces"
+
+msgid "Las imágenes requieren activar la facturación de Gemini en Google AI Studio"
+msgstr "As imagens exigem ativar o faturamento do Gemini no Google AI Studio"
+
+msgid "Gemini está ocupado, inténtalo en un minuto"
+msgstr "O Gemini está ocupado, tente novamente em um minuto"
+
+msgid "No llegó sonido del micrófono. Revisa qué micrófono usa el navegador y su volumen."
+msgstr "Nenhum som chegou do microfone. Verifique qual microfone o navegador usa e o volume."
+
+msgid "La grabación fue muy corta. Pulsa el micrófono, habla y vuelve a pulsarlo al terminar."
+msgstr "A gravação foi muito curta. Pressione o microfone, fale e pressione novamente ao terminar."
+
+msgid "No se entendieron palabras. Habla más cerca del micrófono e inténtalo de nuevo."
+msgstr "Nenhuma palavra foi entendida. Fale mais perto do microfone e tente novamente."
+
+msgid "Generar recurso visual"
+msgstr "Gerar recurso visual"
+
+msgid "Infografía"
+msgstr "Infográfico"
+
+msgid "Mapa conceptual"
+msgstr "Mapa conceitual"
+
+msgid "Diagrama de Ishikawa"
+msgstr "Diagrama de Ishikawa"
+
+msgid "Cuadro comparativo"
+msgstr "Quadro comparativo"
+
+msgid "¿Qué quieres generar?"
+msgstr "O que você quer gerar?"
+
+msgid "Esta respuesta no tiene suficiente contenido para ese tipo de recurso. Prueba con otro."
+msgstr "Esta resposta não tem conteúdo suficiente para esse tipo de recurso. Tente outro."

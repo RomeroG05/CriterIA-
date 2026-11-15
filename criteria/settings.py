@@ -119,12 +119,20 @@ RAG_MIN_SIMILARITY = float(os.getenv("RAG_MIN_SIMILARITY", "0.50"))
 RAG_KEEP_SIMILARITY = RAG_MIN_SIMILARITY - 0.08  # fragmentos más débiles no llegan al modelo
 RAG_STRONG_SIMILARITY = RAG_MIN_SIMILARITY + 0.05  # evidencia que prevalece sobre el clasificador
 
-# --- Gemini: solo da formato (imagen/audio) a respuestas ya fundamentadas en los PDF ---
+# --- Gemini: solo convierte en imagen una respuesta ya fundamentada en los PDF ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL", "gemini-nano-banana-2.1")
-GEMINI_TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.8-flash-lite-tts")
 GEMINI_DAILY_IMAGE_LIMIT = int(os.getenv("GEMINI_DAILY_IMAGE_LIMIT", "5"))
-GEMINI_DAILY_AUDIO_LIMIT = int(os.getenv("GEMINI_DAILY_AUDIO_LIMIT", "20"))
+# «infografia»: imagen local, gratis y fiel a las fuentes. «gemini»: ilustración (requiere facturación).
+IMAGE_ENGINE = os.getenv("IMAGE_ENGINE", "infografia")
+
+# --- Lectura en voz alta local (Piper): una voz por idioma, en voices/ ---
+PIPER_VOICES_DIR = BASE_DIR / "voices"
+PIPER_VOICES = {
+    "es": os.getenv("PIPER_VOICE_ES", "es_MX-claude-high"),
+    "en": os.getenv("PIPER_VOICE_EN", "en_US-lessac-medium"),
+    "pt": os.getenv("PIPER_VOICE_PT", "pt_BR-faber-medium"),
+}
 
 # --- Voz local ---
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")

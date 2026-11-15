@@ -10,3 +10,4 @@ corpus_pdfs/*
 !corpus_pdfs/metadata.csv
 .DS_Store
 .vscode/
+voices/

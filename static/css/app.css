@@ -192,8 +192,14 @@ em { font-style: normal; color: var(--orange); }
 .src-card small { color: var(--ink-2); font-size: 12px; }
 
 .assets { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.asset-item { position: relative; align-self: flex-start; max-width: 100%; }
+.asset-item.audio { display: flex; align-items: center; gap: 6px; width: 100%; max-width: 480px; }
 .assets img { max-width: 100%; border-radius: 13px; border: 1px solid var(--line); display: block; }
-.assets audio { width: 100%; max-width: 440px; }
+.assets audio { width: 100%; }
+.asset-del { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; flex: none; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); transition: color .15s, border-color .15s; }
+.asset-del:hover { color: var(--red); border-color: var(--red); }
+.asset-del .i { width: 15px; height: 15px; }
+.asset-item.image .asset-del { position: absolute; top: 10px; right: 10px; box-shadow: var(--shadow); }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-top: 8px; }
 .actions .icon-btn { width: 32px; height: 32px; }
 .actions .icon-btn .i { width: 16px; height: 16px; }
@@ -332,3 +338,9 @@ em { font-style: normal; color: var(--orange); }
   .viewer { width: 100vw; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.visual-wrap { position: relative; display: inline-flex; }
+.visual-menu { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 20; min-width: 210px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; display: flex; flex-direction: column; }
+.visual-menu-title { font: 600 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px 10px 4px; }
+.visual-menu button { text-align: left; padding: 8px 10px; border-radius: 8px; font-size: 13.5px; color: var(--ink); }
+.visual-menu button:hover { background: var(--surface-2); }

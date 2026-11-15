@@ -8,3 +8,4 @@ lingua-language-detector==2.2.0
 faster-whisper==1.2.1
 markdown==3.10
 av==16.1.0
+piper-tts==1.8.0

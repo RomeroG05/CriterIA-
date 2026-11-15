@@ -1,16 +1,18 @@
+import os
 import base64
 import json
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from corpus.retrieval import Hit
 
-from . import language, media, pipeline
-from .models import Conversation, GeneratedAsset, Message
+from . import infographic, language, media, pipeline, speech, visuals
+from .models import Citation, Conversation, GeneratedAsset, Message
 
 User = get_user_model()
 HIT = Hit(chunk_id=1, document_id=1, page=4, title="Doc", text="La transparencia exige informar.", similarity=0.8)
@@ -39,6 +41,45 @@ class FirstTurnQueryTests(SimpleTestCase):
              patch("chat.pipeline.retrieval.search", return_value=[]) as search:
             list(pipeline.run("Can personal data be processed without consent in Argentina?", "A", [], "es"))
         search.assert_called_with(["Can personal data be processed without consent in Argentina?", "¿Se pueden tratar datos sin consentimiento?"])
+
+
+@override_settings(ALLOWED_HOSTS=["testserver"])
+class VoiceTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def _post(self, exception=None, result=("hola", "es")):
+        with patch("chat.views.speech.transcribe", side_effect=exception, return_value=result):
+            return self.client.post(reverse("chat:transcribe"), {"audio": SimpleUploadedFile("voz.webm", b"x" * 100)})
+
+    def test_transcription_ok(self):
+        self.assertEqual(self._post().json(), {"text": "hola", "language": "es"})
+
+    def test_each_problem_has_its_own_error(self):
+        for exception, code in ((speech.SilentAudio, "silent"), (speech.TooShort, "too_short"), (speech.NoSpeech, "no_speech")):
+            response = self._post(exception)
+            self.assertEqual((response.status_code, response.json()["error"]), (422, code))
+
+    def test_silent_and_short_audio_are_detected_before_whisper(self):
+        import numpy as np
+
+        for audio, exception in ((np.zeros(16000 * 2, dtype=np.float32), speech.SilentAudio),
+                                 (np.full(4000, 0.5, dtype=np.float32), speech.TooShort)):
+            with patch("faster_whisper.audio.decode_audio", return_value=audio), patch("chat.speech._get_model") as model:
+                with self.assertRaises(exception):
+                    speech.transcribe("x.webm")
+            model.assert_not_called()
+
+    def test_falls_back_without_voice_detection_when_it_drops_everything(self):
+        import numpy as np
+
+        model = MagicMock()
+        empty, spoken = MagicMock(language="es"), MagicMock(language="es")
+        model.transcribe.side_effect = [(iter([]), empty), (iter([MagicMock(text=" Hola mundo ")]), spoken)]
+        with patch("faster_whisper.audio.decode_audio", return_value=np.full(32000, 0.05, dtype=np.float32)), \
+             patch("chat.speech._get_model", return_value=model):
+            self.assertEqual(speech.transcribe("x.webm"), ("Hola mundo", "es"))
+        self.assertEqual([c.kwargs["vad_filter"] for c in model.transcribe.call_args_list], [True, False])
 
 
 class ShortMessageLanguageTests(SimpleTestCase):
@@ -309,50 +350,136 @@ class ApiTests(TestCase):
 
 def _gemini_client():
     client = MagicMock()
-    payload = MagicMock(data=base64.b64encode(b"RIFFdata").decode())
-    client.interactions.create.return_value = MagicMock(output_image=payload, output_audio=payload)
+    payload = MagicMock(data=base64.b64encode(b"JPEGdata").decode())
+    client.interactions.create.return_value = MagicMock(output_image=payload)
     return client
 
 
-@override_settings(GEMINI_API_KEY="clave", GEMINI_DAILY_AUDIO_LIMIT=1, MEDIA_ROOT="/tmp/claude-1000/-home-anthony-Documentos-Chat-IA/caa7948b-67b5-4b40-ac83-b043d0f999e7/scratchpad/test_media")
+class FakeVoice:
+    def __init__(self):
+        self.texts = []
+
+    def synthesize_wav(self, text, wav_file):
+        self.texts.append(text)
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(22050)
+        wav_file.writeframes(b"\0\0" * 100)
+
+
+@override_settings(GEMINI_API_KEY="clave", GEMINI_DAILY_IMAGE_LIMIT=1, IMAGE_ENGINE="gemini", MEDIA_ROOT="/tmp/claude-1000/-home-anthony-Documentos-Chat-IA/caa7948b-67b5-4b40-ac83-b043d0f999e7/scratchpad/test_media")
 class GenerationTests(TestCase):
     def setUp(self):
         self.ana = User.objects.create_user("ana@example.com", "x")
         conversation = Conversation.objects.create(user=self.ana, title="t")
-        self.message = Message.objects.create(conversation=conversation, role="assistant", content="### Dilema\nInformar **es clave** [1]", status="answer")
+        self.message = Message.objects.create(conversation=conversation, role="assistant", content="### Dilema\nInformar **es clave** [1]", status="answer", language="pt")
         self.client.force_login(self.ana)
-        self.url = reverse("chat:generate", args=[self.message.id, "audio"])
+        self.audio_url = reverse("chat:generate", args=[self.message.id, "audio"])
+        self.image_url = reverse("chat:generate", args=[self.message.id, "image"])
+        self.voice = FakeVoice()
 
-    def test_generates_once_and_reuses_the_asset(self):
-        gemini = _gemini_client()
-        with patch("chat.media.genai.Client", return_value=gemini):
-            first = self.client.post(self.url).json()
-            second = self.client.post(self.url).json()
+    def _voice(self, language):
+        self.voice_language = language
+        return "voz-prueba", self.voice
+
+    def test_audio_is_local_generated_once_and_reused(self):
+        with patch("chat.media._voice", side_effect=self._voice), patch("chat.media.genai.Client") as gemini:
+            first = self.client.post(self.audio_url).json()
+            second = self.client.post(self.audio_url).json()
         self.assertEqual(first["url"], second["url"])
-        self.assertEqual(gemini.interactions.create.call_count, 1)
-        self.assertEqual(self.client.get(first["url"]).status_code, 200)
+        self.assertEqual(self.voice.texts, ["Dilema\nInformar es clave"])
+        gemini.assert_not_called()
+        response = self.client.get(first["url"])
+        self.assertEqual((response.status_code, response["Content-Type"]), (200, "audio/wav"))
 
-    def test_gemini_receives_only_the_answer_text_and_no_search_tools(self):
+    def test_audio_uses_the_voice_of_the_answer_language(self):
+        with patch("chat.media._voice", side_effect=self._voice):
+            self.client.post(self.audio_url)
+        self.assertEqual(self.voice_language, "pt")
+
+    @override_settings(GEMINI_API_KEY="")
+    def test_audio_does_not_need_gemini(self):
+        with patch("chat.media._voice", side_effect=self._voice):
+            self.assertEqual(self.client.post(self.audio_url).status_code, 200)
+
+    def test_missing_voice_is_reported(self):
+        with override_settings(PIPER_VOICES_DIR="/tmp/claude-1000/-home-anthony-Documentos-Chat-IA/caa7948b-67b5-4b40-ac83-b043d0f999e7/scratchpad/sin_voces"):
+            from chat import media as media_module
+            media_module._voices.clear()
+            self.assertEqual(self.client.post(self.audio_url).json()["error"], "voice_missing")
+
+    def test_image_gets_only_the_answer_text_no_tools_and_jpeg(self):
         gemini = _gemini_client()
         with patch("chat.media.genai.Client", return_value=gemini):
-            self.client.post(self.url)
+            url = self.client.post(self.image_url).json()["url"]
         kwargs = gemini.interactions.create.call_args.kwargs
         self.assertNotIn("tools", kwargs)
-        self.assertEqual(kwargs["input"], "Dilema\nInformar es clave")
+        self.assertIn("Dilema\nInformar es clave", kwargs["input"])
+        self.assertEqual(kwargs["response_format"]["mime_type"], "image/jpeg")
+        self.assertEqual(self.client.get(url)["Content-Type"], "image/jpeg")
 
-    def test_daily_limit(self):
-        GeneratedAsset.objects.create(message=self.message, kind="audio", file="x.wav", model_name="m")
+    def test_daily_image_limit(self):
+        GeneratedAsset.objects.create(message=self.message, kind="image", file="x.jpg", model_name="m")
         other = Message.objects.create(conversation=self.message.conversation, role="assistant", content="b [1]", status="answer")
-        response = self.client.post(reverse("chat:generate", args=[other.id, "audio"]))
+        response = self.client.post(reverse("chat:generate", args=[other.id, "image"]))
         self.assertEqual((response.status_code, response.json()["error"]), (429, "quota"))
+
+    @override_settings(IMAGE_ENGINE="infografia")
+    def test_owner_can_delete_an_asset_and_generate_it_again(self):
+        data = self.client.post(self.image_url).json()
+        asset = GeneratedAsset.objects.get(message=self.message, kind="image")
+        path = asset.file.path
+        self.assertTrue(os.path.exists(path))
+        self.assertEqual(self.client.post(data["delete_url"]).json(), {"deleted": True})
+        self.assertFalse(GeneratedAsset.objects.filter(pk=asset.pk).exists())
+        self.assertFalse(os.path.exists(path))
+        self.assertEqual(self.client.get(data["url"]).status_code, 404)
+        self.assertNotEqual(self.client.post(self.image_url).json()["url"], data["url"])
+
+    def test_visual_kinds_extract_from_the_answer_and_render_locally(self):
+        structures = {
+            "concept_map": {"central": "Transparencia", "branches": [{"concept": "Informar", "details": ["a"]}, {"concept": "Explicar", "details": ["b"]}]},
+            "ishikawa": {"effect": "Publicar sin revisión", "categories": [{"name": "Calidad", "causes": ["x"]}, {"name": "Control", "causes": ["y"]}]},
+            "comparison": {"criteria": ["Riesgo"], "options": [{"name": "Avisar", "values": ["Bajo"]}, {"name": "Ocultar", "values": ["Alto"]}]},
+        }
+        for kind, data in structures.items():
+            with patch("chat.visuals.extract", return_value=visuals.clean(kind, data)) as extract, patch("chat.media.genai.Client") as gemini:
+                response = self.client.post(reverse("chat:generate", args=[self.message.id, kind]))
+            self.assertEqual(response.status_code, 200, kind)
+            self.assertEqual(extract.call_args.args, (kind, self.message.content, "pt"))
+            gemini.assert_not_called()
+            self.assertEqual(self.client.get(response.json()["url"])["Content-Type"], "image/png")
+        self.assertEqual(self.message.assets.count(), 3)
+
+    def test_thin_structures_are_rejected_instead_of_drawn(self):
+        for kind, data in (("concept_map", {"central": "X", "branches": [{"concept": "solo una", "details": []}]}),
+                           ("ishikawa", {"effect": "", "categories": []}),
+                           ("comparison", {"criteria": ["a"], "options": [{"name": "una", "values": ["b"]}]})):
+            with self.assertRaises(visuals.NotEnoughContent):
+                visuals.clean(kind, data)
+        with patch("chat.visuals.extract", side_effect=visuals.NotEnoughContent):
+            response = self.client.post(reverse("chat:generate", args=[self.message.id, "ishikawa"]))
+        self.assertEqual((response.status_code, response.json()["error"]), (422, "not_enough"))
+
+    def test_unknown_visual_kind_is_rejected(self):
+        self.assertEqual(self.client.post(reverse("chat:generate", args=[self.message.id, "pizza"])).status_code, 400)
+
+    def test_others_cannot_delete_assets(self):
+        asset = GeneratedAsset.objects.create(message=self.message, kind="audio", file="x.wav", model_name="m")
+        url = reverse("chat:asset_delete", args=[asset.id])
+        self.client.force_login(User.objects.create_user("luis@example.com", "x"))
+        self.assertEqual(self.client.post(url).status_code, 404)
+        self.client.logout()
+        self.assertEqual(self.client.post(url).status_code, 302)
+        self.assertTrue(GeneratedAsset.objects.filter(pk=asset.pk).exists())
 
     def test_other_users_and_guests_cannot_generate_or_download(self):
         asset = GeneratedAsset.objects.create(message=self.message, kind="audio", file="x.wav", model_name="m")
         self.client.force_login(User.objects.create_user("luis@example.com", "x"))
-        self.assertEqual(self.client.post(self.url).status_code, 404)
+        self.assertEqual(self.client.post(self.audio_url).status_code, 404)
         self.assertEqual(self.client.get(reverse("chat:asset", args=[asset.id])).status_code, 404)
         self.client.logout()
-        self.assertEqual(self.client.post(self.url).status_code, 302)
+        self.assertEqual(self.client.post(self.audio_url).status_code, 302)
 
     def test_limitations_cannot_be_turned_into_media(self):
         limitation = Message.objects.create(conversation=self.message.conversation, role="assistant", content="sin evidencia", status="no_evidence")
@@ -361,6 +488,41 @@ class GenerationTests(TestCase):
     def test_plain_text_strips_markdown_and_citations(self):
         self.assertEqual(media.plain_text("**Hola** [2] _mundo_"), "Hola mundo")
 
+    @override_settings(IMAGE_ENGINE="infografia", GEMINI_API_KEY="")
+    def test_default_image_is_a_local_infographic_without_gemini(self):
+        Message.objects.create(conversation=self.message.conversation, role="user", content="¿Debo avisar del uso de IA?")
+        answer = Message.objects.create(conversation=self.message.conversation, role="assistant", status="answer", language="es",
+                                        content="### Definición\nHay que informar [1].")
+        Citation.objects.create(message=answer, number=1, title="Guía ADEPA", page=4, similarity=0.7, quote="q")
+        with patch("chat.media.genai.Client") as gemini, patch("chat.infographic.render", wraps=infographic.render) as render:
+            url = self.client.post(reverse("chat:generate", args=[answer.id, "image"])).json()["url"]
+        gemini.assert_not_called()
+        question, content, citations, language, mode = render.call_args.args
+        self.assertEqual((question, language, [c.page for c in citations]), ("¿Debo avisar del uso de IA?", "es", [4]))
+        response = self.client.get(url)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertTrue(b"".join(response.streaming_content).startswith(b"\x89PNG"))
+
+    @override_settings(IMAGE_ENGINE="infografia")
+    def test_infographic_has_no_daily_limit(self):
+        GeneratedAsset.objects.create(message=self.message, kind="image", file="x.png", model_name="m")
+        other = Message.objects.create(conversation=self.message.conversation, role="assistant", content="Dato b [1]", status="answer")
+        self.assertEqual(self.client.post(reverse("chat:generate", args=[other.id, "image"])).status_code, 200)
+
+    def test_free_tier_and_busy_errors_are_reported_without_hanging(self):
+        class RateLimit(Exception):
+            status_code = 429
+
+        for message, expected in (("limit: 0 input tokens per minute on Free Tier", "image_billing"), ("Rate limit exceeded", "gemini_busy")):
+            gemini = MagicMock()
+            gemini.interactions.create.side_effect = RateLimit(message)
+            with patch("chat.media.genai.Client", return_value=gemini) as factory:
+                response = self.client.post(self.image_url)
+            self.assertEqual(response.json()["error"], expected)
+            self.assertEqual(factory.call_args.kwargs["http_options"].retry_options.attempts, 1)
+
     @override_settings(GEMINI_API_KEY="")
-    def test_missing_key_is_reported(self):
-        self.assertEqual(self.client.post(self.url).json()["error"], "gemini_missing")
+    def test_missing_gemini_key_is_reported_for_images(self):
+        self.assertEqual(self.client.post(self.image_url).json()["error"], "gemini_missing")
+
+

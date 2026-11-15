@@ -2,6 +2,8 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 
 class Mode(models.TextChoices):
@@ -73,15 +75,24 @@ class Citation(models.Model):
 
 class GeneratedAsset(models.Model):
     class Kind(models.TextChoices):
-        IMAGE = "image"
+        IMAGE = "image"  # infografía local (o ilustración de Gemini)
         AUDIO = "audio"
+        CONCEPT_MAP = "concept_map"
+        ISHIKAWA = "ishikawa"
+        COMPARISON = "comparison"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="assets")
-    kind = models.CharField(max_length=5, choices=Kind.choices)
+    kind = models.CharField(max_length=20, choices=Kind.choices)
     file = models.FileField(upload_to="generated/")
     model_name = models.CharField(max_length=80)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["message", "kind"], name="one_asset_per_kind")]
+
+
+@receiver(post_delete, sender=GeneratedAsset)
+def _remove_asset_file(sender, instance, **kwargs):
+    if instance.file:
+        instance.file.delete(save=False)

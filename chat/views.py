@@ -19,7 +19,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from corpus.models import Chunk, Document
 
-from . import export, media, pipeline, speech, texts
+from . import export, media, pipeline, speech, texts, visuals
 from .models import Citation, Conversation, GeneratedAsset, Message, Mode
 
 log = logging.getLogger(__name__)
@@ -59,14 +59,24 @@ def js_strings() -> dict:
         "page": _("p."),
         "similarity": _("similitud"),
         "copy": _("Copiar"),
+        "removeAsset": _("Eliminar"),
         "copied": _("Copiado"),
         "useful": _("Útil"),
         "notUseful": _("No útil"),
         "audio": _("Generar audio"),
-        "image": _("Generar imagen"),
+        "image": _("Generar recurso visual"),
+        "visualInfographic": _("Infografía"),
+        "visualConceptMap": _("Mapa conceptual"),
+        "visualIshikawa": _("Diagrama de Ishikawa"),
+        "visualComparison": _("Cuadro comparativo"),
+        "visualPrompt": _("¿Qué quieres generar?"),
+        "notEnough": _("Esta respuesta no tiene suficiente contenido para ese tipo de recurso. Prueba con otro."),
         "generating": _("Generando…"),
         "registerToGenerate": _("Regístrate para generar imagen y audio"),
         "geminiMissing": _("La generación con Gemini no está configurada"),
+        "imageBilling": _("Las imágenes requieren activar la facturación de Gemini en Google AI Studio"),
+        "geminiBusy": _("Gemini está ocupado, inténtalo en un minuto"),
+        "voiceMissing": _("Faltan las voces locales: ejecuta python manage.py descargar_voces"),
         "quota": _("Alcanzaste el límite diario para este recurso"),
         "genError": _("No se pudo generar el recurso. Inténtalo nuevamente."),
         "retry": _("Reintentar"),
@@ -76,6 +86,9 @@ def js_strings() -> dict:
         "transcribing": _("Transcribiendo…"),
         "micDenied": _("No se pudo acceder al micrófono"),
         "voiceError": _("No se pudo transcribir el audio"),
+        "voiceSilent": _("No llegó sonido del micrófono. Revisa qué micrófono usa el navegador y su volumen."),
+        "voiceShort": _("La grabación fue muy corta. Pulsa el micrófono, habla y vuelve a pulsarlo al terminar."),
+        "voiceNoSpeech": _("No se entendieron palabras. Habla más cerca del micrófono e inténtalo de nuevo."),
         "aiOnline": _("IA local activa"),
         "aiOffline": _("IA local sin conexión"),
         "documents": _("documentos"),
@@ -92,6 +105,10 @@ def js_strings() -> dict:
     }
 
 
+def _asset_dict(asset: GeneratedAsset) -> dict:
+    return {"kind": asset.kind, "url": reverse("chat:asset", args=[asset.id]), "delete_url": reverse("chat:asset_delete", args=[asset.id])}
+
+
 def _serialize_message(message: Message, latest: bool = False) -> dict:
     data = {
         "id": message.id,
@@ -106,7 +123,7 @@ def _serialize_message(message: Message, latest: bool = False) -> dict:
              "similarity": c.similarity, "quote": c.quote}
             for c in message.citations.all()
         ],
-        "assets": [{"kind": a.kind, "url": reverse("chat:asset", args=[a.id])} for a in message.assets.all()],
+        "assets": [_asset_dict(a) for a in message.assets.all()],
     }
     if latest and message.role == "assistant" and message.status == S.ANSWER:
         data["suggestions"] = texts.suggestions(message.mode, message.language)
@@ -136,7 +153,7 @@ def _render_app(request, conversation=None):
         "mode": conversation.mode if conversation else Mode.CONCEPTS,
         "messages": messages,
         "uiLanguage": _ui_language(),
-        "gemini": bool(settings.GEMINI_API_KEY),
+        "gemini": settings.IMAGE_ENGINE != "gemini" or bool(settings.GEMINI_API_KEY),
         "i18n": js_strings(),
     }
     principles = [_("Veracidad"), _("Transparencia"), _("Autoría"), _("Privacidad"), _("Independencia"), _("Pluralismo"), _("Responsabilidad")]
@@ -317,6 +334,12 @@ def api_transcribe(request):
         handle.flush()
         try:
             text, language = speech.transcribe(handle.name)
+        except speech.TooShort:
+            return JsonResponse({"error": "too_short"}, status=422)
+        except speech.SilentAudio:
+            return JsonResponse({"error": "silent"}, status=422)
+        except speech.NoSpeech:
+            return JsonResponse({"error": "no_speech"}, status=422)
         except Exception:
             log.exception("Fallo de transcripción")
             return JsonResponse({"error": "transcribe"}, status=500)
@@ -352,20 +375,36 @@ def api_generate(request, pk, kind):
         asset = media.generate(message, kind)
     except media.GeminiUnavailable:
         return JsonResponse({"error": "gemini_missing"}, status=503)
+    except media.VoiceUnavailable:
+        return JsonResponse({"error": "voice_missing"}, status=503)
+    except media.ImageBillingRequired:
+        return JsonResponse({"error": "image_billing"}, status=503)
+    except media.GeminiBusy:
+        return JsonResponse({"error": "gemini_busy"}, status=503)
+    except visuals.NotEnoughContent:
+        return JsonResponse({"error": "not_enough"}, status=422)
     except media.QuotaExceeded:
         return JsonResponse({"error": "quota"}, status=429)
     except Exception:
         log.exception("Fallo al generar %s", kind)
         return JsonResponse({"error": "generation"}, status=502)
-    return JsonResponse({"kind": asset.kind, "url": reverse("chat:asset", args=[asset.id])})
+    return JsonResponse(_asset_dict(asset))
 
 
 @login_required
 @require_GET
 def asset_file(request, pk):
     asset = get_object_or_404(GeneratedAsset, pk=pk, message__conversation__user=request.user)
-    content_type = "image/png" if asset.kind == GeneratedAsset.Kind.IMAGE else "audio/wav"
+    extension = asset.file.name.rsplit(".", 1)[-1].lower()
+    content_type = {"wav": "audio/wav", "png": "image/png", "jpg": "image/jpeg"}.get(extension, "application/octet-stream")
     return FileResponse(asset.file.open("rb"), content_type=content_type)
+
+
+@login_required
+@require_POST
+def asset_delete(request, pk):
+    get_object_or_404(GeneratedAsset, pk=pk, message__conversation__user=request.user).delete()
+    return JsonResponse({"deleted": True})
 
 
 @login_required
