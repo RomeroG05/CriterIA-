@@ -75,7 +75,7 @@ class Citation(models.Model):
 
 class GeneratedAsset(models.Model):
     class Kind(models.TextChoices):
-        IMAGE = "image"  # infografía local (o ilustración de Gemini)
+        IMAGE = "image"  # infografía
         AUDIO = "audio"
         CONCEPT_MAP = "concept_map"
         ISHIKAWA = "ishikawa"

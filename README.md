@@ -9,7 +9,7 @@ Chatbot web para comprender y analizar dilemas éticos sobre inteligencia artifi
 | Búsqueda en los PDF | `bge-m3` (semántica) + BM25 (léxica) |
 | Voz a texto | `faster-whisper`, local |
 | Lectura en voz alta | Piper, local |
-| Recursos visuales | Infografía, mapa conceptual, Ishikawa y cuadro comparativo; locales (Gemini opcional) |
+| Recursos visuales | Infografía, mapa conceptual, Ishikawa y cuadro comparativo, locales |
 
 ## Instalación
 
@@ -65,9 +65,6 @@ python manage.py descargar_voces
 
 El botón 🖼 ofrece cuatro recursos en PNG: infografía, mapa conceptual, diagrama de Ishikawa y cuadro comparativo. Para los tres últimos, el modelo local reorganiza solo el texto de la respuesta en una estructura y la app la dibuja. Todo es gratis, sin internet, e incluye las fuentes.
 
-Opcionalmente puede usarse una ilustración de Gemini: pon `IMAGE_ENGINE=gemini` y `GEMINI_API_KEY` en `.env`. Las imágenes no tienen capa gratuita: con una clave sin facturación activa en Google AI Studio, la app muestra un aviso en lugar de la imagen.
-
-Gemini solo convierte en imagen una respuesta ya fundamentada y no tiene acceso a búsquedas. Hay un límite diario por usuario (`GEMINI_DAILY_IMAGE_LIMIT`, 5 por defecto).
 
 ## Cómo funciona una consulta
 
@@ -106,7 +103,7 @@ Usa el modelo real y las preguntas de `evaluacion/preguntas.csv`. En el grupo `d
 criteria/   configuración de Django
 accounts/   registro, inicio de sesión y perfil
 corpus/     ingesta de PDF, búsqueda, citas y visor de páginas
-chat/       flujo conversacional, historial, voz, audio, exportación y Gemini
+chat/       flujo conversacional, historial, voz, audio, recursos visuales y exportación
 locale/     traducciones de la interfaz (en, pt)
 templates/  páginas
 static/     estilos, JavaScript y librerías locales

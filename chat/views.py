@@ -73,11 +73,7 @@ def js_strings() -> dict:
         "notEnough": _("Esta respuesta no tiene suficiente contenido para ese tipo de recurso. Prueba con otro."),
         "generating": _("Generando…"),
         "registerToGenerate": _("Regístrate para generar imagen y audio"),
-        "geminiMissing": _("La generación con Gemini no está configurada"),
-        "imageBilling": _("Las imágenes requieren activar la facturación de Gemini en Google AI Studio"),
-        "geminiBusy": _("Gemini está ocupado, inténtalo en un minuto"),
         "voiceMissing": _("Faltan las voces locales: ejecuta python manage.py descargar_voces"),
-        "quota": _("Alcanzaste el límite diario para este recurso"),
         "genError": _("No se pudo generar el recurso. Inténtalo nuevamente."),
         "retry": _("Reintentar"),
         "stopped": _("Respuesta detenida."),
@@ -153,7 +149,6 @@ def _render_app(request, conversation=None):
         "mode": conversation.mode if conversation else Mode.CONCEPTS,
         "messages": messages,
         "uiLanguage": _ui_language(),
-        "gemini": settings.IMAGE_ENGINE != "gemini" or bool(settings.GEMINI_API_KEY),
         "i18n": js_strings(),
     }
     principles = [_("Veracidad"), _("Transparencia"), _("Autoría"), _("Privacidad"), _("Independencia"), _("Pluralismo"), _("Responsabilidad")]
@@ -373,18 +368,10 @@ def api_generate(request, pk, kind):
         return JsonResponse({"error": "not_answer"}, status=400)
     try:
         asset = media.generate(message, kind)
-    except media.GeminiUnavailable:
-        return JsonResponse({"error": "gemini_missing"}, status=503)
     except media.VoiceUnavailable:
         return JsonResponse({"error": "voice_missing"}, status=503)
-    except media.ImageBillingRequired:
-        return JsonResponse({"error": "image_billing"}, status=503)
-    except media.GeminiBusy:
-        return JsonResponse({"error": "gemini_busy"}, status=503)
     except visuals.NotEnoughContent:
         return JsonResponse({"error": "not_enough"}, status=422)
-    except media.QuotaExceeded:
-        return JsonResponse({"error": "quota"}, status=429)
     except Exception:
         log.exception("Fallo al generar %s", kind)
         return JsonResponse({"error": "generation"}, status=502)

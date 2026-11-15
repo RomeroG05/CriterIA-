@@ -194,7 +194,6 @@
   function generateHandler(view, messageId, kind) {
     return async (button) => {
       if (!boot.authenticated) return toast(T.registerToGenerate);
-      if (kind === "image" && !boot.gemini) return toast(T.geminiMissing);
       if (button.classList.contains("spin")) return;
       button.classList.add("spin");
       const svg = button.innerHTML; button.innerHTML = icon("loader-circle");
@@ -203,7 +202,7 @@
         const res = await post(`/api/mensajes/${messageId}/generar/${kind}/`);
         const data = await res.json();
         if (res.ok) renderAsset(view, data);
-        else toast(data.error === "quota" ? T.quota : data.error === "gemini_missing" ? T.geminiMissing : data.error === "voice_missing" ? T.voiceMissing : data.error === "image_billing" ? T.imageBilling : data.error === "gemini_busy" ? T.geminiBusy : data.error === "not_enough" ? T.notEnough : T.genError);
+        else toast(data.error === "voice_missing" ? T.voiceMissing : data.error === "not_enough" ? T.notEnough : T.genError);
       } catch { toast(T.genError); }
       button.classList.remove("spin"); button.innerHTML = svg;
     };

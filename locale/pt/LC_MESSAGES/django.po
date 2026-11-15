@@ -157,14 +157,6 @@ msgstr "Gerando…"
 msgid "Regístrate para generar imagen y audio"
 msgstr "Cadastre-se para gerar imagem e áudio"
 
-#: chat/views.py:68
-msgid "La generación con Gemini no está configurada"
-msgstr "A geração com Gemini não está configurada"
-
-#: chat/views.py:69
-msgid "Alcanzaste el límite diario para este recurso"
-msgstr "Você atingiu o limite diário para este recurso"
-
 #: chat/views.py:70
 msgid "No se pudo generar el recurso. Inténtalo nuevamente."
 msgstr "Não foi possível gerar o recurso. Tente novamente."
@@ -562,12 +554,6 @@ msgstr "Traduzindo a resposta…"
 
 msgid "Faltan las voces locales: ejecuta python manage.py descargar_voces"
 msgstr "Faltam as vozes locais: execute python manage.py descargar_voces"
-
-msgid "Las imágenes requieren activar la facturación de Gemini en Google AI Studio"
-msgstr "As imagens exigem ativar o faturamento do Gemini no Google AI Studio"
-
-msgid "Gemini está ocupado, inténtalo en un minuto"
-msgstr "O Gemini está ocupado, tente novamente em um minuto"
 
 msgid "No llegó sonido del micrófono. Revisa qué micrófono usa el navegador y su volumen."
 msgstr "Nenhum som chegou do microfone. Verifique qual microfone o navegador usa e o volume."

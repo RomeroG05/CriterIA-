@@ -119,12 +119,6 @@ RAG_MIN_SIMILARITY = float(os.getenv("RAG_MIN_SIMILARITY", "0.50"))
 RAG_KEEP_SIMILARITY = RAG_MIN_SIMILARITY - 0.08  # fragmentos más débiles no llegan al modelo
 RAG_STRONG_SIMILARITY = RAG_MIN_SIMILARITY + 0.05  # evidencia que prevalece sobre el clasificador
 
-# --- Gemini: solo convierte en imagen una respuesta ya fundamentada en los PDF ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL", "gemini-nano-banana-2.1")
-GEMINI_DAILY_IMAGE_LIMIT = int(os.getenv("GEMINI_DAILY_IMAGE_LIMIT", "5"))
-# «infografia»: imagen local, gratis y fiel a las fuentes. «gemini»: ilustración (requiere facturación).
-IMAGE_ENGINE = os.getenv("IMAGE_ENGINE", "infografia")
 
 # --- Lectura en voz alta local (Piper): una voz por idioma, en voices/ ---
 PIPER_VOICES_DIR = BASE_DIR / "voices"
