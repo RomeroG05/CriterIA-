@@ -2,13 +2,13 @@
 {% block title %}{% if conversation %}{{ conversation.title }} · {% endif %}CriterIA{% endblock %}
 {% block body_class %}page-app{% endblock %}
 {% block body %}
-<div class="app" id="app">
+<div class="app" id="app" data-avatar="{% static 'img/criteria-avatar.png' %}">
   <div class="scrim" id="scrim" hidden></div>
 
   <aside class="sidebar" id="sidebar" aria-label="{% translate 'Menú' %}">
     <div class="sb-head">
       <a class="brand" href="{% url 'chat:home' %}">
-        <img src="{% static 'img/logo.svg' %}" alt="" width="32" height="32">
+        <img src="{% static 'img/criteria-emblema.png' %}" alt="" width="34" height="40">
         <span class="brand-text"><b>Criter<em>IA</em></b><small>Reto 2026 · UTPL</small></span>
       </a>
       <button class="icon-btn on-dark" id="sb-close" aria-label="{% translate 'Cerrar menú' %}"><svg class="i"><use href="#i-panel-left"/></svg></button>
@@ -72,7 +72,7 @@
     <section class="thread" id="thread" aria-live="polite">
       <div class="thread-inner" id="messages">
         <div class="empty" id="empty" {% if conversation %}hidden{% endif %}>
-          <img src="{% static 'img/logo.svg' %}" alt="" width="64" height="64">
+          <img class="mascot" src="{% static 'img/criteria-mascota.webp' %}" alt="" width="149" height="160">
           <h2>{% blocktranslate %}¡Hola! Soy CriterIA{% endblocktranslate %}</h2>
           <p>{% translate 'Tu asistente para explorar dilemas éticos en inteligencia artificial, comunicación y periodismo.' %}</p>
           <p class="ask">{% translate '¿Qué te gustaría hacer hoy?' %}</p>
@@ -105,7 +105,7 @@
 
   <aside class="viewer" id="viewer" hidden aria-label="{% translate 'Fuente' %}">
     <header class="v-head">
-      <div class="v-title"><small>{% translate 'Fuente localizada en el corpus' %}</small><b id="v-title"></b></div>
+      <div class="v-title"><b id="v-title"></b><small><svg class="i"><use href="#i-check"/></svg>{% translate 'Fuente localizada en el corpus' %}</small></div>
       <button class="icon-btn" id="v-close" aria-label="{% translate 'Cerrar' %}"><svg class="i"><use href="#i-x"/></svg></button>
     </header>
     <div class="v-tools">

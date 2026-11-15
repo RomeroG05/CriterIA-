@@ -145,8 +145,8 @@ def _concept_map(page, area, data):
             start = pymupdf.Point(root.x0 if side < 0 else root.x1, root.y0 + root.height / 2)
             end = pymupdf.Point(rect.x1 if side < 0 else rect.x0, rect.y0 + rect.height / 2)
             middle = (start.x + end.x) / 2
-            page.draw_bezier(start, pymupdf.Point(middle, start.y), pymupdf.Point(middle, end.y), end, color=base.ORANGE, width=1.6)
-            _box(page, rect, base.SOFT, base.ORANGE)
+            page.draw_bezier(start, pymupdf.Point(middle, start.y), pymupdf.Point(middle, end.y), end, color=base.GOLD, width=1.6)
+            _box(page, rect, base.SOFT, base.GOLD)
             _text(page, rect + (12, 9, -10, -6), _branch_html(branch), BRANCH_CSS)
             y += heights[id(branch)] + gap
     _box(page, root, base.NAVY, radius=0.18)
@@ -155,10 +155,10 @@ def _concept_map(page, area, data):
 
 BRANCH_CSS = """
 .root { color: #ffffff; font-size: 15px; font-weight: bold; text-align: center; margin: 0; }
-.bt { color: #111a2e; font-size: 13px; font-weight: bold; margin: 0 0 4px 0; }
-.bd { color: #3d475c; font-size: 11px; margin: 0 0 2px 0; }
-.lab { color: #ffffff; font-size: 11.5px; font-weight: bold; text-align: center; margin: 0; }
-.cause { color: #3d475c; font-size: 10px; margin: 0; }
+.bt { color: #0e2742; font-size: 13px; font-weight: bold; margin: 0 0 4px 0; }
+.bd { color: #4e5b6d; font-size: 11px; margin: 0 0 2px 0; }
+.lab { color: #1b1404; font-size: 11.5px; font-weight: bold; text-align: center; margin: 0; }
+.cause { color: #4e5b6d; font-size: 10px; margin: 0; }
 """
 
 
@@ -200,7 +200,7 @@ def _ishikawa(page, area, data):
             label_height = min(base._measure(label_html, label_width - 12, base.CSS + BRANCH_CSS), 30) + 10
             label_y = start.y - label_height - 4 if direction < 0 else start.y + 4
             label = pymupdf.Rect(start.x - label_width / 2, label_y, start.x + label_width / 2, label_y + label_height)
-            _box(page, label, base.ORANGE, radius=0.3)
+            _box(page, label, base.GOLD, radius=0.3)
             _text(page, label + (6, 5, -6, -2), label_html, BRANCH_CSS)
             causes = category["causes"]
             for position, cause in enumerate(causes):
@@ -213,9 +213,9 @@ def _ishikawa(page, area, data):
 
 TABLE_CSS = """
 table { width: 100%; border-collapse: collapse; }
-th { background-color: #111a2e; color: #ffffff; font-size: 12px; text-align: left; padding: 7px; border: 1px solid #d5dae5; }
-td { font-size: 11px; color: #1a2235; padding: 7px; border: 1px solid #d5dae5; vertical-align: top; }
-td.crit { font-weight: bold; color: #c2500a; background-color: #f3f5f9; }
+th { background-color: #0e2742; color: #ffffff; font-size: 12px; text-align: left; padding: 7px; border: 1px solid #d7dee7; }
+td { font-size: 11px; color: #142132; padding: 7px; border: 1px solid #d7dee7; vertical-align: top; }
+td.crit { font-weight: bold; color: #7d5b29; background-color: #f3f5f8; }
 """
 
 
