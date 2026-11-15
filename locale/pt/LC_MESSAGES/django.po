@@ -584,3 +584,7 @@ msgstr "O que você quer gerar?"
 
 msgid "Esta respuesta no tiene suficiente contenido para ese tipo de recurso. Prueba con otro."
 msgstr "Esta resposta não tem conteúdo suficiente para esse tipo de recurso. Tente outro."
+
+#: templates/accounts/_auth_base.html
+msgid "Asistente ético institucional"
+msgstr "Assistente ético institucional"

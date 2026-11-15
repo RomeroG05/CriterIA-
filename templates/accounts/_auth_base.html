@@ -1,13 +1,31 @@
 {% extends "base.html" %}{% load i18n static %}
 {% block body_class %}page-auth{% endblock %}
+{% block theme_color %}
+  <meta name="theme-color" content="#0e2742" data-light="#0e2742" data-dark="#08121e" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#08121e" data-light="#0e2742" data-dark="#08121e" media="(prefers-color-scheme: dark)">
+{% endblock %}
 {% block body %}
 <main class="auth">
-  <a class="auth-brand" href="{% url 'chat:home' %}"><img src="{% static 'img/logo.svg' %}" alt="" width="44" height="44"><b>Criter<em>IA</em></b></a>
-  <section class="auth-card">
-    <h1>{% block heading %}{% endblock %}</h1>
-    {% for message in messages %}<p class="form-ok">{{ message }}</p>{% endfor %}
-    {% block content %}{% endblock %}
-  </section>
-  {% include "_lang_switch.html" %}
+  <aside class="auth-aside">
+    <a class="auth-brand lockup" href="{% url 'chat:home' %}"><img src="{% static 'img/criteria-emblema.png' %}" alt="" width="55" height="64"><span><b>Criter<em>IA</em></b><small>{% translate 'Asistente ético institucional' %}</small></span></a>
+    <div>
+      <img class="auth-mascot" src="{% static 'img/criteria-mascota.webp' %}" alt="" width="130" height="140">
+      <p class="auth-claim">{% translate 'Tu asistente para explorar dilemas éticos en inteligencia artificial, comunicación y periodismo.' %}</p>
+      <ul class="auth-points">
+        <li><svg class="i"><use href="#i-book-open"/></svg>{% translate 'Consultar conceptos' %}</li>
+        <li><svg class="i"><use href="#i-search"/></svg>{% translate 'Explorar casos' %}</li>
+        <li><svg class="i"><use href="#i-scale"/></svg>{% translate 'Analizar dilemas' %}</li>
+      </ul>
+    </div>
+    <small>Reto 2026 · UTPL</small>
+  </aside>
+  <div class="auth-main">
+    <section class="auth-card">
+      <h1>{% block heading %}{% endblock %}</h1>
+      {% for message in messages %}<p class="form-ok">{{ message }}</p>{% endfor %}
+      {% block content %}{% endblock %}
+    </section>
+    {% include "_lang_switch.html" %}
+  </div>
 </main>
 {% endblock %}

@@ -1,19 +1,23 @@
 """Exporta una conversación a PDF con sus fuentes, sin servicios externos."""
 import html
 import io
+from pathlib import Path
 
 import markdown
 import pymupdf
 from django.utils import timezone
 
+EMBLEM = Path(__file__).resolve().parent.parent / "static" / "img" / "criteria-emblema-hd.png"
+
 CSS = """
 * { font-family: sans-serif; }
-body { font-size: 10.5pt; line-height: 1.45; color: #1a2235; }
-h1 { font-size: 18pt; color: #111a2e; margin-bottom: 2pt; }
-h3 { font-size: 12pt; color: #111a2e; margin: 8pt 0 3pt 0; }
-.meta { color: #5e6678; font-size: 9pt; }
-.who { font-weight: bold; color: #e8650d; margin-top: 14pt; font-size: 9.5pt; }
-.src { font-size: 9pt; color: #5e6678; }
+body { font-size: 10.5pt; line-height: 1.45; color: #142132; }
+h1 { font-size: 18pt; color: #0e2742; margin-bottom: 2pt; }
+h3 { font-size: 12pt; color: #0e2742; margin: 8pt 0 3pt 0; }
+.meta { color: #4e5b6d; font-size: 9pt; }
+.who { font-weight: bold; color: #7d5b29; margin-top: 14pt; font-size: 9.5pt; }
+.src { font-size: 9pt; color: #4e5b6d; }
+.brand { margin: 0 0 8pt 0; }
 """
 
 
@@ -35,7 +39,11 @@ def conversation_html(conversation, labels: dict) -> str:
 
 
 def conversation_pdf(conversation, labels: dict) -> bytes:
-    story = pymupdf.Story(html=conversation_html(conversation, labels), user_css=CSS)
+    body, archive = conversation_html(conversation, labels), None
+    if EMBLEM.exists():
+        body = f'<p class="brand"><img src="{EMBLEM.name}" width="36"/></p>' + body
+        archive = pymupdf.Archive(str(EMBLEM.parent))
+    story = pymupdf.Story(html=body, user_css=CSS, archive=archive)
     buffer = io.BytesIO()
     writer = pymupdf.DocumentWriter(buffer)
     page = pymupdf.paper_rect("a4")

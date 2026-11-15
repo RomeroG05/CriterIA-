@@ -5,6 +5,7 @@ ya dice, con sus citas, así que no puede inventar nada.
 """
 import html
 import re
+from pathlib import Path
 
 import markdown
 import pymupdf
@@ -14,11 +15,12 @@ WIDTH = 720  # puntos; con ZOOM sale una imagen de 1440 px de ancho
 MARGIN = 44
 BAND = 74
 ZOOM = 2
+EMBLEM = Path(__file__).resolve().parent.parent / "static" / "img" / "criteria-emblema-hd.png"
 
-NAVY = (0x11 / 255, 0x1A / 255, 0x2E / 255)
-ORANGE = (1, 0x7A / 255, 0x1A / 255)
+NAVY = (0x0E / 255, 0x27 / 255, 0x42 / 255)
+GOLD = (0xC9 / 255, 0xA4 / 255, 0x6B / 255)
 PAPER = (1, 1, 1)
-SOFT = (0xF3 / 255, 0xF5 / 255, 0xF9 / 255)
+SOFT = (0xF3 / 255, 0xF5 / 255, 0xF8 / 255)
 
 LABELS = {
     "es": {"sources": "Fuentes", "page": "p.", "mode": {"A": "Concepto", "B": "Casos", "C": "Dilema ético"},
@@ -31,17 +33,17 @@ LABELS = {
 
 CSS = """
 * { font-family: sans-serif; }
-body { color: #1a2235; font-size: 12.5px; line-height: 1.5; }
-h1 { font-size: 21px; color: #111a2e; margin: 0 0 6px 0; line-height: 1.25; }
-h3 { font-size: 14.5px; color: #c2500a; margin: 14px 0 4px 0; }
+body { color: #142132; font-size: 12.5px; line-height: 1.5; }
+h1 { font-size: 21px; color: #0e2742; margin: 0 0 6px 0; line-height: 1.25; }
+h3 { font-size: 14.5px; color: #7d5b29; margin: 14px 0 4px 0; }
 p { margin: 0 0 8px 0; }
 ul, ol { margin: 0 0 8px 0; padding-left: 18px; }
 li { margin: 0 0 5px 0; }
-.cite { color: #c2500a; font-weight: bold; font-size: 10px; }
-.src-title { font-size: 13px; font-weight: bold; color: #111a2e; margin: 0 0 6px 0; }
-.src { font-size: 11px; color: #4a5468; margin: 0 0 4px 0; }
-.num { color: #ff7a1a; font-weight: bold; }
-.footer { font-size: 9.5px; color: #7a8396; }
+.cite { color: #7d5b29; font-weight: bold; font-size: 10px; }
+.src-title { font-size: 13px; font-weight: bold; color: #0e2742; margin: 0 0 6px 0; }
+.src { font-size: 11px; color: #4e5b6d; margin: 0 0 4px 0; }
+.num { color: #7d5b29; font-weight: bold; }
+.footer { font-size: 9.5px; color: #66727f; }
 """
 
 
@@ -86,16 +88,20 @@ def compose(width, head_html, citations, language, mode, subtitle="", body_heigh
     page = document.new_page(width=width, height=height)
     page.draw_rect(page.rect, color=None, fill=PAPER)
     page.draw_rect(pymupdf.Rect(0, 0, width, BAND), color=None, fill=NAVY)
-    page.draw_rect(pymupdf.Rect(0, BAND, width, BAND + 4), color=None, fill=ORANGE)
+    page.draw_rect(pymupdf.Rect(0, BAND, width, BAND + 4), color=None, fill=GOLD)
+    brand_x = MARGIN
+    if EMBLEM.exists():
+        page.insert_image(pymupdf.Rect(MARGIN, 12, MARGIN + 43, BAND - 12), filename=str(EMBLEM), keep_proportion=True)
+        brand_x = MARGIN + 56
     page.insert_htmlbox(
-        pymupdf.Rect(MARGIN, 20, width / 2, BAND - 10),
-        '<p style="font-size:24px;font-weight:bold;color:#ffffff;margin:0">Criter<span style="color:#ff7a1a">IA</span></p>',
+        pymupdf.Rect(brand_x, 20, width / 2, BAND - 10),
+        '<p style="font-size:24px;font-weight:bold;color:#ffffff;margin:0">Criter<span style="color:#c9a46b">IA</span></p>',
         css=CSS,
     )
     tag = subtitle or labels["mode"].get(mode, "")
     page.insert_htmlbox(
         pymupdf.Rect(width / 2, 30, width - MARGIN, BAND - 10),
-        f'<p style="text-align:right;font-size:12px;color:#a2acc2;margin:0">{html.escape(tag)} · {language.upper()}</p>',
+        f'<p style="text-align:right;font-size:12px;color:#a9b7c9;margin:0">{html.escape(tag)} · {language.upper()}</p>',
         css=CSS,
     )
 
@@ -108,7 +114,7 @@ def compose(width, head_html, citations, language, mode, subtitle="", body_heigh
     if sources_html:
         box = pymupdf.Rect(MARGIN, top, width - MARGIN, top + sources_height)
         page.draw_rect(box, color=None, fill=SOFT, radius=0.04)
-        page.draw_rect(pymupdf.Rect(box.x0, box.y0, box.x0 + 4, box.y1), color=None, fill=ORANGE)
+        page.draw_rect(pymupdf.Rect(box.x0, box.y0, box.x0 + 4, box.y1), color=None, fill=GOLD)
         _fit(page, pymupdf.Rect(box.x0 + 18, box.y0 + 13, box.x1 - 10, box.y1), sources_html)
 
     footer = f'{html.escape(labels["footer"])} · {timezone.localdate().isoformat()}'

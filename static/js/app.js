@@ -4,7 +4,7 @@
   const T = boot.i18n;
   const $ = (id) => document.getElementById(id);
   const icon = (name) => `<svg class="i"><use href="#i-${name}"/></svg>`;
-  const LOGO = document.querySelector('link[rel="icon"]').href;
+  const AVATAR = document.getElementById("app").dataset.avatar;
   const LANGUAGE_LABEL = { es: "Español", en: "English", pt: "Português" };
   const NOTICE_ICON = { ambiguous: "circle-help", out_of_domain: "ban", no_evidence: "file-x", error: "triangle-alert" };
 
@@ -15,6 +15,7 @@
     abort: null,
     guestHistory: [],
     language: boot.uiLanguage,
+    booted: false,
   };
 
   const app = $("app"), thread = $("thread"), list = $("messages"), input = $("input"), send = $("send");
@@ -59,13 +60,16 @@
         if (citation && citation.chunk_id) {
           const button = el("button", "cite-ref", match[1]);
           button.type = "button";
+          button.dataset.n = match[1];
           button.title = `${citation.title}, ${T.page} ${citation.page}`;
           button.addEventListener("click", () => openViewer(citation.chunk_id));
           fragment.append(button);
         } else if (!match || !citation) {
           fragment.append(part);
         } else {
-          fragment.append(el("span", "cite-ref", match[1]));
+          const span = el("span", "cite-ref", match[1]);
+          span.dataset.n = match[1];
+          fragment.append(span);
         }
       }
       node.replaceWith(fragment);
@@ -79,6 +83,7 @@
   // ---------- Mensajes ----------
   function addUser(text) {
     const article = el("article", "msg user");
+    if (state.booted) article.classList.add("is-new");
     const bubble = el("div", "bubble");
     bubble.textContent = text;
     article.append(bubble);
@@ -97,8 +102,9 @@
 
   function newBotView() {
     const article = el("article", "msg bot");
+    if (state.booted) article.classList.add("is-new");
     const img = el("img");
-    img.src = LOGO; img.alt = ""; img.width = 32; img.height = 32;
+    img.src = AVATAR; img.alt = ""; img.width = 32; img.height = 32;
     const body = el("div", "msg-body");
     const meta = el("div", "msg-meta", "<span>CriterIA</span>");
     const content = el("div", "md");
@@ -116,6 +122,7 @@
     for (const c of citations) {
       const card = el("button", "src-card");
       card.type = "button";
+      card.dataset.n = String(c.number);
       card.disabled = !c.chunk_id;
       const percent = Math.round(c.similarity * 100);
       const number = el("span", "n", String(c.number));
@@ -129,6 +136,20 @@
     }
     view.body.append(heading, grid);
   }
+
+  // Al señalar una cita, se ilumina su fuente (y al revés), solo dentro de la misma respuesta.
+  function linkSource(event, on) {
+    if (event.pointerType === "touch") return;
+    const target = event.target.closest?.(".cite-ref[data-n], .src-card[data-n]");
+    const body = target?.closest(".msg-body");
+    if (!body) return;
+    body.querySelectorAll(`.cite-ref[data-n="${target.dataset.n}"], .src-card[data-n="${target.dataset.n}"]`)
+      .forEach((node) => node.classList.toggle("is-linked", on));
+  }
+  list.addEventListener("pointerover", (e) => linkSource(e, true));
+  list.addEventListener("pointerout", (e) => linkSource(e, false));
+  list.addEventListener("focusin", (e) => linkSource(e, true));
+  list.addEventListener("focusout", (e) => linkSource(e, false));
 
   function renderAsset(view, asset) {
     let box = view.body.querySelector(".assets");
@@ -513,11 +534,12 @@
     const marks = $("v-marks");
     marks.innerHTML = "";
     if (viewer.page === s.page) {
-      for (const [x0, y0, x1, y1] of s.bboxes) {
+      s.bboxes.forEach(([x0, y0, x1, y1], index) => {
         const mark = el("div", "v-mark");
         Object.assign(mark.style, { left: x0 * 100 + "%", top: y0 * 100 + "%", width: (x1 - x0) * 100 + "%", height: (y1 - y0) * 100 + "%" });
+        mark.style.setProperty("--i", Math.min(index, 12));
         marks.append(mark);
-      }
+      });
     }
   }
 
@@ -579,7 +601,7 @@
 
   // ---------- Barra lateral ----------
   const scrim = $("scrim");
-  const isMobile = () => matchMedia("(max-width: 860px)").matches;
+  const isMobile = () => matchMedia("(max-width: 1023px)").matches;
   function closeDrawer() { app.classList.remove("drawer"); scrim.hidden = true; }
   $("sb-open").addEventListener("click", () => {
     if (isMobile()) { app.classList.add("drawer"); scrim.hidden = false; }
@@ -630,10 +652,26 @@
   const root = document.documentElement;
   const darkNow = () => root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   function paintTheme() { $("theme").innerHTML = icon(darkNow() ? "sun" : "moon"); }
-  $("theme").addEventListener("click", () => {
-    root.dataset.theme = darkNow() ? "light" : "dark";
-    try { localStorage.setItem("theme", root.dataset.theme); } catch {}
+  function applyTheme(next) {
+    root.dataset.theme = next;
+    try { localStorage.setItem("theme", next); } catch {}
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => (m.content = m.dataset[next] || m.content));
     paintTheme();
+  }
+  // El tema nuevo se revela en un círculo que nace del botón; sin animación si se pidió menos movimiento.
+  $("theme").addEventListener("click", () => {
+    const next = darkNow() ? "light" : "dark";
+    if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return applyTheme(next);
+    const r = $("theme").getBoundingClientRect();
+    const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    const transition = document.startViewTransition(() => applyTheme(next));
+    transition.ready.then(() => {
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 380, easing: "cubic-bezier(0.23, 1, 0.32, 1)", pseudoElement: "::view-transition-new(root)" },
+      );
+    }).catch(() => {});
   });
   paintTheme();
 
@@ -664,5 +702,6 @@
     }
   }
   if (boot.messages.length) toBottom();
+  state.booted = true;
   if (!isMobile()) input.focus();
 })();
