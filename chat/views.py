@@ -85,6 +85,16 @@ def js_strings() -> dict:
         "voiceSilent": _("No llegó sonido del micrófono. Revisa qué micrófono usa el navegador y su volumen."),
         "voiceShort": _("La grabación fue muy corta. Pulsa el micrófono, habla y vuelve a pulsarlo al terminar."),
         "voiceNoSpeech": _("No se entendieron palabras. Habla más cerca del micrófono e inténtalo de nuevo."),
+        "voiceGuest": _("Regístrate para usar el modo voz"),
+        "voiceListening": _("Te escucho…"),
+        "voiceSpeaking": _("Respondiendo…"),
+        "voicePaused": _("Micrófono en pausa"),
+        "voicePause": _("Pausar micrófono"),
+        "voiceResume": _("Activar micrófono"),
+        "voiceInterrupt": _("Habla o toca el búho para interrumpir"),
+        "voiceHint": _("Habla con naturalidad: te respondo en voz alta con lo que dicen los documentos."),
+        "voiceRetry": _("No te entendí bien. ¿Puedes repetirlo?"),
+        "voiceFailed": _("No pude responder en este momento. Inténtalo otra vez."),
         "aiOnline": _("IA local activa"),
         "aiOffline": _("IA local sin conexión"),
         "documents": _("documentos"),
@@ -271,11 +281,12 @@ def api_chat(request):
             fallback = payload["language"]
 
     is_new = bool(conversation) and not payload.get("conversation_id")
+    voice = bool(payload.get("voice")) and request.user.is_authenticated  # el modo voz es solo para registrados
 
     def stream():
         started = time.monotonic()
         partial, language, finished = [], fallback, False
-        events = pipeline.run(text, mode, history, fallback)
+        events = pipeline.run(text, mode, history, fallback, voice=voice)
         if conversation:
             yield _line({"type": "conversation", "id": str(conversation.id), "title": conversation.title, "new": is_new,
                          "url": reverse("chat:conversation", args=[conversation.id])})
@@ -318,7 +329,7 @@ def api_chat(request):
 
 @require_POST
 def api_transcribe(request):
-    if not _allowed(request, "voice", 30):
+    if not _allowed(request, "voice", 120 if request.user.is_authenticated else 30):
         return JsonResponse({"error": "rate"}, status=429)
     upload = request.FILES.get("audio")
     if upload is None or upload.size > MAX_AUDIO_BYTES:
@@ -339,6 +350,33 @@ def api_transcribe(request):
             log.exception("Fallo de transcripción")
             return JsonResponse({"error": "transcribe"}, status=500)
     return JsonResponse({"text": text, "language": language})
+
+
+@require_POST
+def api_speak(request):
+    """Convierte en voz una frase de la respuesta mientras llega, para el modo voz."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "auth"}, status=403)
+    if not _allowed(request, "speak", 600):
+        return JsonResponse({"error": "rate"}, status=429)
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "json"}, status=400)
+    text = media.plain_text(str(payload.get("text", "")))[: media.MAX_SPEECH_CHARS]
+    language = payload.get("language")
+    if not any(c.isalnum() for c in text) or language not in {"es", "en", "pt"}:
+        return JsonResponse({"error": "text"}, status=400)
+    try:
+        data = media.speak(text, language)
+    except media.VoiceUnavailable:
+        return JsonResponse({"error": "voice_missing"}, status=503)
+    except Exception:
+        log.exception("Fallo al sintetizar la voz")
+        return JsonResponse({"error": "speak"}, status=500)
+    response = HttpResponse(data, content_type="audio/wav")
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 def _owned_message(request, pk) -> Message:

@@ -18,6 +18,7 @@ from . import infographic, visuals
 from .models import GeneratedAsset, Message
 
 MAX_AUDIO_CHARS = 4000
+MAX_SPEECH_CHARS = 600  # una frase del modo voz
 Kind = GeneratedAsset.Kind
 _voices: dict = {}
 _voice_lock = threading.Lock()
@@ -53,6 +54,15 @@ def _audio_bytes(message: Message) -> tuple[bytes, str, str]:
     with wave.open(buffer, "wb") as wav_file:
         voice.synthesize_wav(plain_text(message.content)[:MAX_AUDIO_CHARS], wav_file)
     return buffer.getvalue(), "wav", f"piper:{name}"
+
+
+def speak(text: str, language: str) -> bytes:
+    """Una frase del modo voz: se sintetiza al momento y no se guarda como recurso."""
+    _, voice = _voice(language)
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav_file:
+        voice.synthesize_wav(plain_text(text)[:MAX_SPEECH_CHARS], wav_file)
+    return buffer.getvalue()
 
 
 def generate(message: Message, kind: str) -> GeneratedAsset:

@@ -588,3 +588,59 @@ msgstr "This answer does not have enough content for that kind of visual. Try an
 #: templates/accounts/_auth_base.html
 msgid "Asistente ético institucional"
 msgstr "Institutional ethics assistant"
+
+#: modo voz
+msgid "Hablar con CriterIA"
+msgstr "Talk to CriterIA"
+
+#: modo voz
+msgid "Modo voz"
+msgstr "Voice mode"
+
+#: modo voz
+msgid "Interrumpir"
+msgstr "Interrupt"
+
+#: modo voz
+msgid "Pausar micrófono"
+msgstr "Mute microphone"
+
+#: modo voz
+msgid "Terminar modo voz"
+msgstr "End voice mode"
+
+#: modo voz
+msgid "Regístrate para usar el modo voz"
+msgstr "Sign up to use voice mode"
+
+#: modo voz
+msgid "Te escucho…"
+msgstr "I'm listening…"
+
+#: modo voz
+msgid "Respondiendo…"
+msgstr "Answering…"
+
+#: modo voz
+msgid "Micrófono en pausa"
+msgstr "Microphone muted"
+
+#: modo voz
+msgid "Activar micrófono"
+msgstr "Unmute microphone"
+
+#: modo voz
+msgid "Habla o toca el búho para interrumpir"
+msgstr "Speak or tap the owl to interrupt"
+
+#: modo voz
+msgid "Habla con naturalidad: te respondo en voz alta con lo que dicen los documentos."
+msgstr "Speak naturally: I'll answer out loud with what the documents say."
+
+#: modo voz
+msgid "No te entendí bien. ¿Puedes repetirlo?"
+msgstr "I didn't quite catch that. Could you say it again?"
+
+#: modo voz
+msgid "No pude responder en este momento. Inténtalo otra vez."
+msgstr "I couldn't answer right now. Please try again."

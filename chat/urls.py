@@ -15,6 +15,7 @@ urlpatterns = [
     path("api/estado/", views.api_status, name="status"),
     path("api/chat/", views.api_chat, name="api_chat"),
     path("api/voz/", views.api_transcribe, name="transcribe"),
+    path("api/voz/hablar/", views.api_speak, name="speak"),
     path("api/mensajes/<int:pk>/valorar/", views.api_feedback, name="feedback"),
     path("api/mensajes/<int:pk>/generar/<str:kind>/", views.api_generate, name="generate"),
 ]

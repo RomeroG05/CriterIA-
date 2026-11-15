@@ -171,12 +171,13 @@ def validate_answer(text: str, available: int) -> tuple[str, set[int]]:
     return CITATION_RE.sub(keep, text).strip(), used
 
 
-def stream_answer(mode: str, language: str, question: str, hits) -> Iterator[str]:
+def stream_answer(mode: str, language: str, question: str, hits, voice: bool = False) -> Iterator[str]:
     """Redacta sin el historial: la pregunta ya llega reescrita como autónoma, y con la respuesta
-    anterior delante el modelo tiende a copiarla, incluso en otro idioma."""
+    anterior delante el modelo tiende a copiarla, incluso en otro idioma.
+    En modo voz la respuesta es corta y conversacional; en el chat escrito no cambia nada."""
     numbered = [(i, h.title, h.page, h.text) for i, h in enumerate(hits, start=1)]
     messages = [
-        {"role": "system", "content": prompts.answer_system(mode, language)},
+        {"role": "system", "content": prompts.answer_system(mode, language, voice)},
         {"role": "user", "content": prompts.answer_user(question, numbered, language)},
     ]
     stream = _client().chat(
@@ -185,7 +186,7 @@ def stream_answer(mode: str, language: str, question: str, hits) -> Iterator[str
         stream=True,
         keep_alive="30m",
         # Semilla fija: la misma pregunta con las mismas fuentes recibe siempre la misma respuesta.
-        options={"temperature": 0.2, "seed": 42, "num_ctx": settings.OLLAMA_NUM_CTX, "num_predict": 1000},
+        options={"temperature": 0.2, "seed": 42, "num_ctx": settings.OLLAMA_NUM_CTX, "num_predict": 320 if voice else 1000},
         messages=messages,
     )
     for chunk in stream:
@@ -214,8 +215,8 @@ def translate_answer(answer: str, language: str) -> str:
     return response["message"]["content"]
 
 
-def run(text: str, mode: str, history: list[Turn], fallback_language: str) -> Iterator[dict]:
-    """Genera eventos `status`, `sources`, `token` y un `final`."""
+def run(text: str, mode: str, history: list[Turn], fallback_language: str, voice: bool = False) -> Iterator[dict]:
+    """Genera eventos `status`, `sources`, `token` y un `final`. `voice` pide la versión hablada."""
     language = lang_module.detect(text, fallback_language)
     plain = _plain(text)
     if len(plain.split()) <= 3:  # en saludos cortos la palabra indica el idioma mejor que el detector
@@ -271,7 +272,7 @@ def run(text: str, mode: str, history: list[Turn], fallback_language: str) -> It
 
         collected, released = "", False
         hold = len(prompts.NO_EVIDENCE) + 2
-        for token in stream_answer(mode, language, query, hits):
+        for token in stream_answer(mode, language, query, hits, voice=voice):
             collected += token
             if not released:
                 if len(collected.lstrip()) < hold and prompts.NO_EVIDENCE.startswith(collected.lstrip()[:len(prompts.NO_EVIDENCE)]):

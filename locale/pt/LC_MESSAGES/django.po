@@ -588,3 +588,59 @@ msgstr "Esta resposta não tem conteúdo suficiente para esse tipo de recurso. T
 #: templates/accounts/_auth_base.html
 msgid "Asistente ético institucional"
 msgstr "Assistente ético institucional"
+
+#: modo voz
+msgid "Hablar con CriterIA"
+msgstr "Falar com o CriterIA"
+
+#: modo voz
+msgid "Modo voz"
+msgstr "Modo voz"
+
+#: modo voz
+msgid "Interrumpir"
+msgstr "Interromper"
+
+#: modo voz
+msgid "Pausar micrófono"
+msgstr "Pausar microfone"
+
+#: modo voz
+msgid "Terminar modo voz"
+msgstr "Encerrar modo voz"
+
+#: modo voz
+msgid "Regístrate para usar el modo voz"
+msgstr "Cadastre-se para usar o modo voz"
+
+#: modo voz
+msgid "Te escucho…"
+msgstr "Estou ouvindo…"
+
+#: modo voz
+msgid "Respondiendo…"
+msgstr "Respondendo…"
+
+#: modo voz
+msgid "Micrófono en pausa"
+msgstr "Microfone pausado"
+
+#: modo voz
+msgid "Activar micrófono"
+msgstr "Ativar microfone"
+
+#: modo voz
+msgid "Habla o toca el búho para interrumpir"
+msgstr "Fale ou toque na coruja para interromper"
+
+#: modo voz
+msgid "Habla con naturalidad: te respondo en voz alta con lo que dicen los documentos."
+msgstr "Fale naturalmente: respondo em voz alta com o que dizem os documentos."
+
+#: modo voz
+msgid "No te entendí bien. ¿Puedes repetirlo?"
+msgstr "Não entendi bem. Pode repetir?"
+
+#: modo voz
+msgid "No pude responder en este momento. Inténtalo otra vez."
+msgstr "Não consegui responder agora. Tente novamente."

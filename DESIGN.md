@@ -61,6 +61,19 @@ Las fuentes son locales, en `static/fonts/`, con licencia SIL OFL. Las cifras qu
 1. **Cita ↔ fuente.** Al pasar el cursor o enfocar una cita `[n]`, se ilumina su tarjeta en «Fuentes», y al revés. Lo hacen `linkSource()` en [static/js/app.js](static/js/app.js) y la clase `.is-linked`.
 2. **Resaltador.** En el visor, cada fragmento del PDF se subraya de izquierda a derecha, uno tras otro, como un marcador (`.v-mark`, retraso según `--i`).
 
+## Modo voz
+
+Es una pantalla completa en azul tinta, la misma en ambos temas. En el centro está el búho sobre un disco champán (`--disc`), y dos anillos dorados muestran el estado:
+
+| Estado | Qué se ve |
+|---|---|
+| Escuchando | los anillos crecen con tu voz |
+| Transcribiendo y pensando | el disco respira y el anillo interior, punteado, gira |
+| Respondiendo | los anillos siguen el volumen de la voz de CriterIA |
+| En pausa | el búho en gris y el botón del micrófono en rojo |
+
+Debajo, en este orden: el estado, lo que entendió (entre comillas) y la frase que está diciendo, en Source Serif 4. Los únicos controles son los modos, pausar el micrófono y terminar (✕); también se puede tocar el búho para interrumpir. Con movimiento reducido, los anillos solo cambian de intensidad.
+
 ## Movimiento
 
 - Curvas: `--ease-out` para entradas e interacciones, `--ease-drawer` para cajón y hojas.

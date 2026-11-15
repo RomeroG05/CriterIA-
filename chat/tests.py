@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from corpus.retrieval import Hit
 
-from . import infographic, language, media, pipeline, speech, visuals
+from . import infographic, language, media, pipeline, prompts, speech, visuals
 from .models import Citation, Conversation, GeneratedAsset, Message
 
 User = get_user_model()
@@ -475,3 +475,75 @@ class GenerationTests(TestCase):
         self.assertEqual(self.client.post(reverse("chat:generate", args=[other.id, "image"])).status_code, 200)
 
 
+
+
+class VoiceModeTests(TestCase):
+    """Modo voz: respuesta breve y hablada solo para registrados; el chat escrito no cambia."""
+
+    def setUp(self):
+        cache.clear()
+        self.ana = User.objects.create_user("ana@example.com", "x")
+
+    def test_written_prompt_keeps_its_format_and_spoken_prompt_is_short_plain_text(self):
+        written = prompts.answer_system("A", "es")
+        spoken = prompts.answer_system("A", "es", voice=True)
+        self.assertIn("Use Markdown", written)
+        self.assertIn("### Definición", written)
+        self.assertNotIn("Use Markdown", spoken)
+        self.assertNotIn("###", spoken)
+        self.assertIn("spoken aloud", spoken)
+        self.assertIn("square brackets", spoken)  # sigue citando sus fuentes
+
+    def test_spoken_answer_is_shorter(self):
+        client = MagicMock()
+        client.chat.return_value = iter([{"message": {"content": "Hola [1]"}}])
+        with patch("chat.pipeline._client", return_value=client):
+            list(pipeline.stream_answer("C", "es", "¿Pregunta?", [HIT], voice=True))
+        self.assertEqual(client.chat.call_args.kwargs["options"]["num_predict"], 320)
+        self.assertIn("spoken aloud", client.chat.call_args.kwargs["messages"][0]["content"])
+
+    def _voice_flag(self, **extra):
+        with patch("chat.views.pipeline.retrieval.search", return_value=[HIT]), \
+             patch("chat.pipeline.route", return_value=("consulta", "q", "q")), \
+             patch("chat.pipeline.stream_answer", return_value=iter(["Informar [1]"])) as answer:
+            response = self.client.post(reverse("chat:api_chat"), json.dumps({"message": "¿Debo avisar si usé IA?", "mode": "A", **extra}),
+                                        content_type="application/json")
+            b"".join(response.streaming_content)
+        return answer.call_args.kwargs["voice"]
+
+    def test_only_registered_users_get_the_spoken_answer(self):
+        self.assertFalse(self._voice_flag(voice=True))
+        self.client.force_login(self.ana)
+        self.assertTrue(self._voice_flag(voice=True))
+        self.assertFalse(self._voice_flag())
+
+    def _speak(self, text="Hay que **informar** al público [2].", language="es"):
+        return self.client.post(reverse("chat:speak"), json.dumps({"text": text, "language": language}), content_type="application/json")
+
+    def test_speaking_requires_an_account(self):
+        self.assertEqual(self._speak().status_code, 403)
+
+    def test_speaks_the_sentence_without_citations_or_markdown_and_stores_nothing(self):
+        self.client.force_login(self.ana)
+        voice = FakeVoice()
+        with patch("chat.media._voice", return_value=("voz", voice)) as pick:
+            response = self._speak(language="pt")
+        self.assertEqual((response.status_code, response["Content-Type"]), (200, "audio/wav"))
+        self.assertTrue(response.content.startswith(b"RIFF"))
+        pick.assert_called_with("pt")
+        self.assertNotIn("[2]", voice.texts[0])
+        self.assertNotIn("**", voice.texts[0])
+        self.assertFalse(GeneratedAsset.objects.exists())
+
+    def test_rejects_empty_text_or_unknown_language_and_reports_missing_voices(self):
+        self.client.force_login(self.ana)
+        self.assertEqual(self._speak(text=" [1] ").status_code, 400)
+        self.assertEqual(self._speak(language="fr").status_code, 400)
+        with patch("chat.media._voice", side_effect=media.VoiceUnavailable("x")):
+            response = self._speak()
+        self.assertEqual((response.status_code, response.json()["error"]), (503, "voice_missing"))
+
+    def test_voice_screen_is_only_rendered_for_registered_users(self):
+        self.assertNotContains(self.client.get(reverse("chat:home")), 'id="voice-mode"')
+        self.client.force_login(self.ana)
+        self.assertContains(self.client.get(reverse("chat:home")), 'id="voice-mode"')

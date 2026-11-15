@@ -96,6 +96,7 @@
           </div>
           <span class="spacer"></span>
           <button type="button" class="icon-btn" id="mic" aria-label="{% translate 'Dictar por voz' %}" title="{% translate 'Dictar por voz' %}"><svg class="i"><use href="#i-mic"/></svg></button>
+          <button type="button" class="icon-btn" id="voice" aria-label="{% translate 'Hablar con CriterIA' %}" title="{% translate 'Hablar con CriterIA' %}"><svg class="i"><use href="#i-audio-lines"/></svg></button>
           <button type="submit" class="send" id="send" aria-label="{% translate 'Enviar' %}"><svg class="i"><use href="#i-send"/></svg></button>
         </div>
       </form>
@@ -136,6 +137,34 @@
   <p class="cite-warn" id="cite-warn" hidden></p>
   <footer><button class="btn-sm primary" id="cite-copy"><svg class="i"><use href="#i-copy"/></svg><span>{% translate 'Copiar' %}</span></button></footer>
 </dialog>
+
+{% if user.is_authenticated %}
+<div class="voice" id="voice-mode" role="dialog" aria-modal="true" aria-labelledby="voice-title" data-state="idle" hidden>
+  <header class="voice-top">
+    <p class="voice-title" id="voice-title"><svg class="i"><use href="#i-audio-lines"/></svg>{% translate 'Modo voz' %}</p>
+    <div class="voice-modes" role="radiogroup" aria-label="{% translate 'Modo' %}">
+      <button type="button" role="radio" data-mode="A">{% translate 'Conceptos' %}</button>
+      <button type="button" role="radio" data-mode="B">{% translate 'Casos' %}</button>
+      <button type="button" role="radio" data-mode="C">{% translate 'Dilemas' %}</button>
+    </div>
+  </header>
+  <div class="voice-stage">
+    <button type="button" class="voice-orb" id="voice-orb" aria-label="{% translate 'Interrumpir' %}">
+      <img src="{% static 'img/criteria-mascota.webp' %}" alt="" width="186" height="200">
+    </button>
+    <p class="voice-status" id="voice-status" aria-live="polite"></p>
+    <div class="voice-captions">
+      <p class="voice-heard" id="voice-heard"></p>
+      <p class="voice-said" id="voice-said"></p>
+      <p class="voice-hint" id="voice-hint"></p>
+    </div>
+  </div>
+  <footer class="voice-controls">
+    <button type="button" class="voice-btn" id="voice-mic" aria-pressed="false" aria-label="{% translate 'Pausar micrófono' %}" title="{% translate 'Pausar micrófono' %}"><svg class="i"><use href="#i-mic"/></svg></button>
+    <button type="button" class="voice-btn end" id="voice-end" aria-label="{% translate 'Terminar modo voz' %}" title="{% translate 'Terminar modo voz' %}"><svg class="i"><use href="#i-x"/></svg></button>
+  </footer>
+</div>
+{% endif %}
 
 <div class="toast" id="toast" role="status" hidden></div>
 {% for message in messages %}<div class="flash" data-flash>{{ message }}</div>{% endfor %}

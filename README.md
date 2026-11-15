@@ -61,6 +61,10 @@ El botón de audio lee la respuesta en voz alta con Piper, sin internet, con una
 python manage.py descargar_voces
 ```
 
+## Modo voz (usuarios registrados)
+
+El botón de ondas, junto al micrófono, abre una conversación hablada: el navegador detecta cuándo terminas de hablar, Whisper transcribe, CriterIA busca en los PDF y responde con una versión breve y conversacional que Piper lee frase a frase mientras se genera. Se puede interrumpir hablando o tocando el búho. Todo queda guardado en la conversación con sus fuentes; el chat escrito no cambia. Desde que terminas de hablar hasta que empieza a responder pasan unos 5 a 6 segundos en un portátil con RTX 4050 (Whisper corre en CPU).
+
 ## Imagen
 
 El botón 🖼 ofrece cuatro recursos en PNG: infografía, mapa conceptual, diagrama de Ishikawa y cuadro comparativo. Para los tres últimos, el modelo local reorganiza solo el texto de la respuesta en una estructura y la app la dibuja. Todo es gratis, sin internet, e incluye las fuentes.

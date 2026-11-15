@@ -333,9 +333,11 @@
     group.querySelector("h3").after(row);
   }
 
-  async function submit(text) {
+  // options.voice: consulta hecha en modo voz (respuesta breve); options.onEvent recibe cada evento del stream.
+  // Devuelve cómo terminó: "final", "error" o "aborted".
+  async function submit(text, options = {}) {
     text = (text ?? input.value).trim();
-    if (!text || state.busy) return;
+    if (!text || state.busy) return "busy";
     $("empty").hidden = true;
     clearSuggestions();
     addUser(text);
@@ -346,7 +348,7 @@
     setBusy(true);
     state.abort = new AbortController();
 
-    let streamed = "", sources = [], raf = 0, ended = false;
+    let streamed = "", sources = [], raf = 0, ended = false, outcome = "error";
     const paint = () => {
       raf = 0;
       const stick = nearBottom();
@@ -356,6 +358,7 @@
     };
 
     const handle = (event) => {
+      options.onEvent?.(event);
       switch (event.type) {
         case "conversation":
           state.conversationId = event.id;
@@ -385,6 +388,7 @@
           break;
         case "final":
           ended = true;
+          outcome = "final";
           if (raf) cancelAnimationFrame(raf);
           renderFinal(view, { ...event, id: event.message_id });
           if (!boot.authenticated && event.status === "answer") {
@@ -411,7 +415,7 @@
         method: "POST",
         signal: state.abort.signal,
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
-        body: JSON.stringify({ message: text, mode: state.mode, conversation_id: state.conversationId, history: state.guestHistory, language: state.language }),
+        body: JSON.stringify({ message: text, mode: state.mode, conversation_id: state.conversationId, history: state.guestHistory, language: state.language, voice: !!options.voice }),
       });
       if (!response.ok) {
         let message = T.genError;
@@ -436,24 +440,26 @@
       if (!ended) showError(view, T.genError, text);
     } catch (error) {
       if (error.name === "AbortError") {
+        outcome = "aborted";
         if (raf) cancelAnimationFrame(raf);
         if (streamed) { view.content.className = "md"; renderMarkdown(view.content, streamed, sources); view.body.append(el("p", "tag", T.stopped)); }
-        else { view.article.previousElementSibling?.remove(); view.article.remove(); input.value = text; resizeInput(); }
+        else { view.article.previousElementSibling?.remove(); view.article.remove(); if (!options.voice) { input.value = text; resizeInput(); } }
       } else {
         showError(view, T.genError, text);
       }
     } finally {
       setBusy(false);
       state.abort = null;
-      input.focus();
+      if (!voice.on) input.focus(); // con el modo voz abierto, el foco se queda en sus controles
       if (nearBottom()) toBottom();
     }
+    return outcome;
   }
 
   // ---------- Modo ----------
   function setMode(mode) {
     state.mode = mode;
-    document.querySelectorAll(".modes button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.mode === mode)));
+    document.querySelectorAll(".modes button, .voice-modes button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.mode === mode)));
     input.placeholder = T["placeholder" + mode];
   }
   document.querySelectorAll(".modes button").forEach((b) => b.addEventListener("click", () => { setMode(b.dataset.mode); input.focus(); }));
@@ -519,6 +525,338 @@
       toast(T.recording);
       stopTimer = setTimeout(() => recorder?.stop(), 60000);
     });
+  }
+
+  // ---------- Modo voz (solo usuarios registrados) ----------
+  // Escucha -> Whisper transcribe -> consulta con respuesta breve -> Piper lee cada frase al completarse -> escucha otra vez.
+  // Todo queda escrito en la conversación, con sus fuentes, como cualquier otra consulta.
+  const voiceRoot = $("voice-mode"), voiceButton = $("voice"), orb = $("voice-orb");
+  const voice = {
+    on: false, paused: false, phase: "idle", turn: 0, gen: 0, turns: 0,
+    stream: null, ctx: null, micAnalyser: null, outAnalyser: null, micData: null, outData: null, raf: 0, last: 0, level: 0,
+    recorder: null, recStart: 0, heard: false, speechMs: 0, silenceMs: 0, bargeMs: 0, echo: 0, floor: 0.008,
+    raw: "", consumed: 0, language: "es", queue: [], playing: false, source: null, answerDone: false, endAfter: false,
+    themeColors: [],
+  };
+  const VOICE_STATUS = { listening: T.voiceListening, transcribing: T.transcribing, thinking: T.analyzing, speaking: T.voiceSpeaking, paused: T.voicePaused };
+  const VOICE_STAGE = { analyzing: T.analyzing, searching: T.searching, writing: T.writing, translating: T.translating };
+  // Lo que se lee en voz alta: sin números de cita ni símbolos de Markdown.
+  const speakable = (text) => text
+    .replace(/\[\d{1,2}\]/g, "")
+    .replace(/^\s*(?:[-*•]|\d+[.)])\s+/gm, "")
+    .replace(/[#*_`>|]+/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([.,;:!?…])/g, "$1")
+    .trim();
+
+  function setPhase(phase, status) {
+    voice.phase = phase;
+    voiceRoot.dataset.state = phase;
+    $("voice-status").textContent = status ?? VOICE_STATUS[phase] ?? "";
+    $("voice-hint").textContent = phase === "speaking" ? T.voiceInterrupt : phase === "listening" && !voice.turns ? T.voiceHint : "";
+  }
+
+  // Frases completas recibidas hasta ahora (un punto seguido de espacio cierra una frase; «25.326» no).
+  // Las muy cortas se juntan con la siguiente para que la entonación suene natural.
+  function takeSentences(flush) {
+    const rest = voice.raw.slice(voice.consumed);
+    const pieces = [];
+    const boundary = /[.!?…]+(?=\s)|\n+/g;
+    let start = 0, match;
+    while ((match = boundary.exec(rest))) {
+      const end = match.index + match[0].length;
+      if (speakable(rest.slice(start, end)).length >= 18 || match[0][0] === "\n") { pieces.push(rest.slice(start, end)); start = end; }
+    }
+    if (flush) { pieces.push(rest.slice(start)); start = rest.length; }
+    voice.consumed += start;
+    return pieces;
+  }
+
+  function enqueue(text) {
+    const clean = speakable(text);
+    if (!/[\p{L}\p{N}]/u.test(clean)) return;
+    const audio = fetch("/api/voz/hablar/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+      body: JSON.stringify({ text: clean, language: voice.language }),
+    }).then((res) => { if (!res.ok) throw res; return res.arrayBuffer(); })
+      .then((data) => voice.ctx.decodeAudioData(data));
+    audio.catch(() => {}); // el error se atiende al reproducir
+    voice.queue.push({ clean, audio, gen: voice.gen });
+    if (!voice.playing) playNext();
+  }
+
+  async function playNext() {
+    const item = voice.queue.shift();
+    if (!item) { voice.playing = false; if (voice.answerDone) answerSpoken(); return; }
+    voice.playing = true;
+    let buffer;
+    try { buffer = await item.audio; }
+    catch (error) {
+      if (item.gen !== voice.gen) return;
+      if (error?.status === 503) $("voice-hint").textContent = T.voiceMissing;
+      return playNext();
+    }
+    if (item.gen !== voice.gen || !voice.on) return;
+    if (voice.phase !== "speaking") setPhase("speaking");
+    $("voice-said").textContent = item.clean;
+    const source = voice.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(voice.outAnalyser);
+    source.onended = () => { if (voice.source === source) { voice.source = null; playNext(); } };
+    voice.source = source;
+    source.start();
+  }
+
+  // Corta la voz en curso y descarta las frases pendientes.
+  function stopSpeech() {
+    voice.gen++;
+    voice.queue = [];
+    voice.playing = false;
+    const source = voice.source;
+    voice.source = null;
+    try { source?.stop(); } catch {}
+  }
+
+  function answerSpoken() {
+    if (!voice.on) return;
+    if (voice.endAfter) return closeVoice(); // «adiós»: se despide y cierra
+    if (voice.paused) setPhase("paused"); else startListening();
+  }
+
+  function startRecorder() {
+    stopRecorder(true);
+    const recorder = new MediaRecorder(voice.stream);
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = () => { if (!recorder.discard) transcribeVoice(new Blob(chunks, { type: recorder.mimeType || "audio/webm" })); };
+    recorder.start();
+    Object.assign(voice, { recorder, recStart: performance.now(), heard: false, speechMs: 0, silenceMs: 0 });
+  }
+
+  function stopRecorder(discard) {
+    const recorder = voice.recorder;
+    voice.recorder = null;
+    if (recorder && recorder.state !== "inactive") { recorder.discard = discard; recorder.stop(); }
+  }
+
+  function startListening() {
+    if (!voice.on) return;
+    voice.bargeMs = 0;
+    voice.echo = 0;
+    setPhase("listening");
+    startRecorder();
+  }
+
+  // Detección de voz por volumen: aprende el ruido de fondo y da la frase por terminada tras 0,9 s de silencio.
+  function listenStep(level, dt, now) {
+    if (!voice.heard && level < voice.floor * 3) voice.floor = voice.floor * 0.98 + level * 0.02;
+    const threshold = Math.max(0.012, voice.floor * 3);
+    if (level > threshold) { voice.speechMs += dt; voice.silenceMs = 0; if (voice.speechMs > 200) voice.heard = true; }
+    else if (voice.heard) voice.silenceMs += dt;
+    else voice.speechMs = Math.max(0, voice.speechMs - dt);
+    const length = now - voice.recStart;
+    if (voice.heard && (voice.silenceMs > 900 || length > 30000)) { setPhase("transcribing"); stopRecorder(false); }
+    else if (!voice.heard && length > 15000) startRecorder(); // sin voz: se reinicia para no acumular silencio
+  }
+
+  // Mientras CriterIA habla, una voz clara y sostenida la interrumpe (el navegador cancela el eco de los altavoces).
+  function bargeStep(level, dt) {
+    if (voice.bargeMs === 0) voice.echo = voice.echo * 0.97 + level * 0.03; // eco residual que se cuela de los altavoces
+    const threshold = Math.max(0.05, voice.floor * 6, voice.echo * 2.5);
+    voice.bargeMs = level > threshold ? voice.bargeMs + dt : Math.max(0, voice.bargeMs - dt * 2);
+    if (voice.bargeMs > 380) interrupt();
+  }
+
+  function rms(analyser, data) {
+    analyser.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (const value of data) sum += value * value;
+    return Math.sqrt(sum / data.length);
+  }
+
+  function voiceLoop(now) {
+    if (!voice.on) return;
+    const dt = Math.min(100, now - (voice.last || now));
+    voice.last = now;
+    const mic = rms(voice.micAnalyser, voice.micData), out = rms(voice.outAnalyser, voice.outData);
+    if (voice.phase === "listening") listenStep(mic, dt, now);
+    else if (voice.phase === "speaking" && !voice.paused) bargeStep(mic, dt);
+    const target = voice.phase === "speaking" ? out * 4 : voice.phase === "listening" ? mic * 6 : 0;
+    voice.level += (Math.min(1, target) - voice.level) * 0.35;
+    orb.style.setProperty("--level", voice.level.toFixed(3));
+    voice.raf = requestAnimationFrame(voiceLoop);
+  }
+
+  async function transcribeVoice(blob) {
+    if (!voice.on) return;
+    const turn = ++voice.turn;
+    setPhase("transcribing");
+    const form = new FormData();
+    form.append("audio", blob, blob.type.includes("ogg") ? "voz.ogg" : "voz.webm");
+    let data;
+    try {
+      const res = await fetch("/api/voz/", { method: "POST", headers: { "X-CSRFToken": csrf() }, body: form });
+      data = await res.json();
+    } catch { data = { error: "transcribe" }; }
+    if (turn !== voice.turn || !voice.on) return;
+    if (!data.text) {
+      // Ruido, tos o una grabación muy corta: se sigue escuchando sin molestar.
+      if (!["no_speech", "too_short", "silent"].includes(data.error)) $("voice-said").textContent = T.voiceRetry;
+      return voice.paused ? setPhase("paused") : startListening();
+    }
+    askVoice(data.text, turn);
+  }
+
+  async function askVoice(text, turn) {
+    $("voice-heard").textContent = `«${text}»`;
+    $("voice-said").textContent = "";
+    Object.assign(voice, { raw: "", consumed: 0, answerDone: false, endAfter: false, language: state.language });
+    voice.turns++;
+    setPhase("thinking");
+    for (let waited = 0; state.busy && waited < 3000; waited += 50) await new Promise((r) => setTimeout(r, 50));
+    if (turn !== voice.turn || !voice.on) return;
+    const outcome = await submit(text, { voice: true, onEvent: (event) => onVoiceEvent(event, turn) });
+    if (turn !== voice.turn || !voice.on || voice.answerDone) return;
+    voice.answerDone = true; // la consulta falló antes de responder
+    if (outcome !== "aborted") enqueue(T.voiceFailed);
+    if (!voice.playing && !voice.queue.length) answerSpoken();
+  }
+
+  function speakAll(content) {
+    stopSpeech();
+    voice.raw = content;
+    voice.consumed = 0;
+    takeSentences(true).forEach(enqueue);
+  }
+
+  function onVoiceEvent(event, turn) {
+    if (turn !== voice.turn || !voice.on) return;
+    switch (event.type) {
+      case "language":
+        voice.language = event.language;
+        break;
+      case "status":
+        if (voice.phase === "thinking") setPhase("thinking", VOICE_STAGE[event.stage]);
+        break;
+      case "token":
+        voice.raw += event.text;
+        takeSentences(false).forEach(enqueue);
+        break;
+      case "final":
+        voice.answerDone = true;
+        voice.endAfter = event.status === "farewell";
+        voice.language = event.language || voice.language;
+        // Si la respuesta final no es la que se fue leyendo (otro idioma o sin evidencia), se lee la final.
+        if (event.status === "answer" && speakable(voice.raw) === speakable(event.content)) takeSentences(true).forEach(enqueue);
+        else speakAll(event.content);
+        if (!voice.playing && !voice.queue.length) answerSpoken();
+        break;
+      case "error":
+        voice.answerDone = true;
+        speakAll(event.content);
+        if (!voice.playing && !voice.queue.length) answerSpoken();
+        break;
+    }
+  }
+
+  // Interrumpir: calla, detiene la respuesta si aún se escribe y vuelve a escuchar.
+  function interrupt() {
+    voice.turn++;
+    stopSpeech();
+    if (state.busy) state.abort?.abort();
+    if (voice.paused) setPhase("paused"); else startListening();
+  }
+
+  function togglePause() {
+    voice.paused = !voice.paused;
+    const button = $("voice-mic");
+    const label = voice.paused ? T.voiceResume : T.voicePause;
+    button.setAttribute("aria-pressed", String(voice.paused));
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.innerHTML = icon(voice.paused ? "mic-off" : "mic");
+    voice.stream.getAudioTracks().forEach((track) => (track.enabled = !voice.paused));
+    if (voice.paused && voice.phase === "listening") { stopRecorder(true); setPhase("paused"); }
+    else if (!voice.paused && voice.phase === "paused") startListening();
+  }
+
+  function setThemeColor(color) {
+    document.querySelectorAll('meta[name="theme-color"]').forEach((meta, i) => {
+      if (color) { voice.themeColors[i] = meta.content; meta.content = color; }
+      else if (voice.themeColors[i]) meta.content = voice.themeColors[i];
+    });
+  }
+
+  async function openVoice() {
+    if (voice.on) return;
+    const Context = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Context(); // se crea dentro del clic para que el navegador permita reproducir audio
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+    catch { ctx.close(); return toast(T.micDenied); }
+    if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+    const micAnalyser = ctx.createAnalyser(), outAnalyser = ctx.createAnalyser(), mute = ctx.createGain();
+    micAnalyser.fftSize = outAnalyser.fftSize = 1024;
+    mute.gain.value = 0; // el micrófono se analiza pero no se oye
+    ctx.createMediaStreamSource(stream).connect(micAnalyser);
+    micAnalyser.connect(mute).connect(ctx.destination);
+    outAnalyser.connect(ctx.destination);
+    Object.assign(voice, {
+      on: true, paused: false, turns: 0, stream, ctx, micAnalyser, outAnalyser, level: 0, last: 0, floor: 0.008,
+      micData: new Float32Array(1024), outData: new Float32Array(1024), queue: [], playing: false, source: null,
+    });
+    $("voice-heard").textContent = "";
+    $("voice-said").textContent = "";
+    const micButton = $("voice-mic");
+    micButton.setAttribute("aria-pressed", "false");
+    micButton.setAttribute("aria-label", T.voicePause);
+    micButton.title = T.voicePause;
+    micButton.innerHTML = icon("mic");
+    setMode(state.mode);
+    closeDrawer();
+    app.inert = true;
+    document.body.classList.add("voice-open");
+    voiceRoot.hidden = false;
+    setThemeColor(darkNow() ? "#08121e" : "#0e2742");
+    $("voice-end").focus();
+    startListening();
+    voice.raf = requestAnimationFrame(voiceLoop);
+  }
+
+  function closeVoice() {
+    if (!voice.on) return;
+    voice.on = false;
+    voice.turn++;
+    stopSpeech();
+    stopRecorder(true);
+    cancelAnimationFrame(voice.raf);
+    voice.stream?.getTracks().forEach((track) => track.stop());
+    voice.ctx?.close().catch(() => {});
+    voiceRoot.hidden = true;
+    voiceRoot.dataset.state = "idle";
+    app.inert = false;
+    document.body.classList.remove("voice-open");
+    setThemeColor(null);
+    voiceButton.focus();
+  }
+
+  const canTalk = navigator.mediaDevices?.getUserMedia && window.MediaRecorder && (window.AudioContext || window.webkitAudioContext);
+  if (!canTalk) voiceButton.hidden = true; // requiere https o localhost
+  else voiceButton.addEventListener("click", () => {
+    if (!boot.authenticated || !voiceRoot) return toast(T.voiceGuest);
+    if (!state.busy) openVoice();
+  });
+  if (voiceRoot) {
+    $("voice-end").addEventListener("click", closeVoice);
+    $("voice-mic").addEventListener("click", togglePause);
+    orb.addEventListener("click", () => {
+      if (voice.phase === "speaking" || voice.phase === "thinking") interrupt();
+      else if (voice.phase === "paused") togglePause();
+      else if (voice.phase === "listening" && voice.heard) { setPhase("transcribing"); stopRecorder(false); }
+    });
+    voiceRoot.querySelectorAll(".voice-modes button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+    voiceRoot.addEventListener("keydown", (e) => { if (e.key === "Escape") closeVoice(); });
   }
 
   // ---------- Visor de fuentes y citas ----------
