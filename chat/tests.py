@@ -212,10 +212,18 @@ class FlowTests(SimpleTestCase):
             (("ambigua", "a", "a"), ("consulta", "b", "b"), ("consulta", "b", "b")),  # «¿y sus consecuencias?»
             (("fuera_de_dominio", "a", "a"), ("fuera_de_dominio", "b", "b"), ("fuera_de_dominio", "b", "b")),
             (("ambigua", "a", "a"), ("ambigua", "b", "b"), ("ambigua", "b", "b")),
+            # «¿qué es lo más importante que deberías saber?» dentro de una conversación sigue el tema
+            (("sobre_asistente", "a", "a"), ("consulta", "b", "b"), ("consulta", "b", "b")),
+            (("sobre_asistente", "a", "a"), ("sobre_asistente", "b", "b"), ("consulta", "b (x)", "b")),
         ]
         for alone, contextual, expected in table:
             with patch("chat.pipeline._classify", side_effect=[alone, contextual]):
                 self.assertEqual(pipeline.route("texto", history), expected)
+
+    def test_explicit_questions_about_the_assistant_ignore_the_topic(self):
+        with patch("chat.pipeline._classify", return_value=("sobre_asistente", "a", "a")) as classify:
+            self.assertEqual(pipeline.route("¿Quién eres?", [pipeline.Turn("user", "x")])[0], "sobre_asistente")
+        self.assertEqual(classify.call_count, 1)
 
     def test_routing_without_history_uses_a_single_call(self):
         with patch("chat.pipeline._classify", return_value=("consulta", "a", "a")) as classify:
@@ -547,3 +555,200 @@ class VoiceModeTests(TestCase):
         self.assertNotContains(self.client.get(reverse("chat:home")), 'id="voice-mode"')
         self.client.force_login(self.ana)
         self.assertContains(self.client.get(reverse("chat:home")), 'id="voice-mode"')
+
+
+class LanguageRequestTests(SimpleTestCase):
+    """«Tradúcelo» o «ahora en inglés»: se responde en ese idioma, siempre desde los PDF."""
+
+    def test_detects_requests_and_separates_the_included_question(self):
+        cases = {
+            "puedes traducir la respuesta anterior al español": ("es", ""),
+            "ahora en inglés": ("en", ""),
+            "agora em português": ("pt", ""),
+            "Translate that into Spanish": ("es", ""),
+            "traduce al español esta pregunta:\nDoes a journalist have the right to enter government premises?":
+                ("es", "Does a journalist have the right to enter government premises?"),
+            "What is a deepfake? Answer in Portuguese.": ("pt", "What is a deepfake?"),
+            "¿Qué es un deepfake?": (None, ""),
+            "¿Cómo se dice deepfake en español?": (None, ""),
+        }
+        for text, expected in cases.items():
+            self.assertEqual(pipeline.language_request(text), expected, text)
+
+    def _run(self, text, history):
+        with patch("chat.pipeline.route", return_value=("consulta", "q", "¿Puede un periodista entrar?")) as router, \
+             patch("chat.pipeline.retrieval.search", return_value=[HIT]) as search, \
+             patch("chat.pipeline.stream_answer", return_value=iter(["Sí puede [1]"])) as answer:
+            events = list(pipeline.run(text, "A", history, "es"))
+        return events, router, search, answer
+
+    def test_previous_question_is_answered_again_in_the_requested_language(self):
+        history = [pipeline.Turn("user", "Does a journalist have the right to enter government premises?"),
+                   pipeline.Turn("assistant", "Yes, with limits [1]")]
+        events, router, search, answer = self._run("puedes traducir la respuesta anterior al español", history)
+        self.assertEqual(events[0]["language"], "es")
+        self.assertEqual(router.call_args.args[0], "Does a journalist have the right to enter government premises?")
+        self.assertEqual(answer.call_args.args[1], "es")
+        self.assertIn("¿Puede un periodista entrar?", search.call_args.args[0])  # pregunta en inglés: también se busca en español
+        self.assertEqual(events[-1]["status"], "answer")
+        self.assertTrue(events[-1]["citations"])
+
+    def test_included_question_is_answered_in_the_requested_language(self):
+        events, router, _, answer = self._run("Traduce al español:\nWhat are the limits for journalists in public buildings?", [])
+        self.assertEqual(router.call_args.args[0], "What are the limits for journalists in public buildings?")
+        self.assertEqual(answer.call_args.args[1], "es")
+
+    def test_without_a_previous_answer_it_asks_what_to_translate(self):
+        events, router, _, _ = self._run("ahora en inglés", [])
+        self.assertEqual((events[-1]["status"], events[-1]["language"]), ("ambiguous", "en"))
+        router.assert_not_called()
+
+
+class InformalLanguageRequestTests(SimpleTestCase):
+    def test_informal_requests_are_understood(self):
+        for text, code in {"en portugues": "pt", "pásalo a inglés": "en", "y en portugués?": "pt", "inglés porfa": "en",
+                           "english please": "en", "tradúcelo": "es", "translate it": "en", "traduz isso": "pt",
+                           "lo quiero en portugués": "pt", "ponlo en ingles": "en", "ok ahora en español": "es"}.items():
+            self.assertEqual(pipeline.language_request(text), (code, ""), text)
+
+    def test_normal_questions_are_not_taken_as_language_requests(self):
+        for text in ("¿Cómo se dice deepfake en español?", "Explica el hábeas data", "what about english newspapers and AI ethics?"):
+            self.assertEqual(pipeline.language_request(text), (None, ""), text)
+
+    def test_chained_requests_go_back_to_the_original_question(self):
+        history = [pipeline.Turn("user", "Does a journalist have the right to enter government premises?"), pipeline.Turn("assistant", "Yes [1]"),
+                   pipeline.Turn("user", "puedes ahora decirlo en español"), pipeline.Turn("assistant", "Sí [1]")]
+        question, context, _ = pipeline._previous_question(history)
+        self.assertEqual(question, "Does a journalist have the right to enter government premises?")
+        self.assertEqual(context, [])
+
+
+class StyleRequestTests(SimpleTestCase):
+    """«Solo lo más importante», «más simple», «dame un ejemplo»: se obedece la instrucción con las mismas fuentes."""
+
+    def test_detects_informal_instructions_about_the_previous_answer(self):
+        cases = {"No, solo lo más importante.": "brief", "resúmelo": "brief", "just the key points": "brief", "o mais importante": "brief",
+                 "explícalo más simple": "simple", "no entendí nada": "simple", "dame un ejemplo": "examples",
+                 "más detalle porfa": "detail", "ponlo en lista": "list"}
+        for text, style in cases.items():
+            self.assertEqual(pipeline.style_request(text), (style, ""), text)
+
+    def test_an_instruction_with_its_own_topic_is_a_new_question(self):
+        self.assertEqual(pipeline.style_request("lo más importante de la ley de datos personales"),
+                         ("brief", "lo más importante de la ley de datos personales"))
+        for text in ("¿Qué es la transparencia?", "¿Puedes decirme algo sobre la Constitución Argentina?"):
+            self.assertEqual(pipeline.style_request(text), (None, ""), text)
+
+    def test_style_replaces_the_mode_format_but_keeps_the_rules(self):
+        brief = prompts.answer_system("A", "es", style="brief")
+        self.assertIn("most important points", brief)
+        self.assertNotIn("### Definición", brief)
+        self.assertIn("square brackets", brief)
+        self.assertIn("most important points", prompts.answer_system("A", "es", voice=True, style="brief"))
+
+    def test_previous_question_is_answered_again_following_the_instruction(self):
+        history = [pipeline.Turn("user", "¿Puedes decirme algo sobre la Constitución Argentina?"), pipeline.Turn("assistant", "Es federal [1]")]
+        with patch("chat.pipeline.route", return_value=("consulta", "q", "q")) as router, \
+             patch("chat.pipeline.retrieval.search", return_value=[HIT]), \
+             patch("chat.pipeline.stream_answer", return_value=iter(["Lo esencial [1]"])) as answer:
+            events = list(pipeline.run("No, solo lo más importante.", "A", history, "es"))
+        self.assertEqual(router.call_args.args[0], "¿Puedes decirme algo sobre la Constitución Argentina?")
+        self.assertEqual(answer.call_args.kwargs["style"], "brief")
+        self.assertEqual((events[-1]["status"], events[-1]["language"]), ("answer", "es"))
+
+
+class RefusalCleanupTests(SimpleTestCase):
+    def test_grounded_answer_that_opens_with_a_refusal_is_kept_without_that_sentence(self):
+        tokens = ("### Definition\nThe sources do not contain information regarding whether it can be published.\n\n"
+                  "### Explanation\n* Publishing requires consent [1].\n* There are public interest exceptions [2].",)
+        _, final, _ = run(hits=(HIT, HIT), tokens=tokens)
+        self.assertEqual(final["status"], "answer")
+        self.assertNotIn("do not contain", final["content"])
+        self.assertNotIn("Definition", final["content"])
+
+    def test_a_refusal_with_a_single_citation_is_still_no_evidence(self):
+        _, final, _ = run(tokens=("Los documentos no mencionan este tema, solo hablan de otra cosa [1].",))
+        self.assertEqual(final["status"], "no_evidence")
+
+    def test_short_instructions_keep_the_conversation_language(self):
+        history = [pipeline.Turn("user", "¿Se puede publicar la vida privada?"), pipeline.Turn("assistant", "Con consentimiento [1]")]
+        with patch("chat.pipeline.route", return_value=("consulta", "q", "q")), \
+             patch("chat.pipeline.retrieval.search", return_value=[HIT]), \
+             patch("chat.pipeline.stream_answer", return_value=iter(["Lo esencial es el consentimiento [1]"])):
+            events = list(pipeline.run("solo dejame lo mas importante", "A", history, "es"))
+        self.assertEqual(events[0]["language"], "es")
+
+
+class LongRequestChainTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.ana = User.objects.create_user("ana@example.com", "x")
+
+    def test_original_question_is_found_after_many_chained_requests(self):
+        self.client.force_login(self.ana)
+        conversation = Conversation.objects.create(user=self.ana, title="t")
+        pairs = [("¿Se puede publicar la vida privada de una persona?", "es"), ("en ingles", "en"), ("en portugues", "pt"),
+                 ("solo dejame lo mas importante", "pt"), ("más simple", "pt")]
+        for question, language in pairs:
+            Message.objects.create(conversation=conversation, role="user", content=question, language=language)
+            Message.objects.create(conversation=conversation, role="assistant", content="Respuesta [1]", status="answer", language=language)
+        with patch("chat.views.pipeline.retrieval.search", return_value=[HIT]), \
+             patch("chat.pipeline.route", return_value=("consulta", "q", "q")) as router, \
+             patch("chat.pipeline.stream_answer", return_value=iter(["Con consentimiento [1]"])):
+            response = self.client.post(reverse("chat:api_chat"), json.dumps({"message": "ahora en español", "conversation_id": str(conversation.id)}),
+                                        content_type="application/json")
+            events = [json.loads(line) for line in b"".join(response.streaming_content).decode().splitlines()]
+        self.assertEqual(router.call_args.args[0], "¿Se puede publicar la vida privada de una persona?")
+        self.assertEqual((events[-1]["status"], events[-1]["language"]), ("answer", "es"))
+
+
+class InstructionChainTests(SimpleTestCase):
+    def test_instruction_language(self):
+        for text, fallback, expected in (("Just leave me the most important part.", "es", "en"),
+                                         ("solo dejame lo mas importante", "pt", "es"),
+                                         ("só me deixa o mais importante", "es", "pt"),
+                                         ("resúmelo", "pt", "pt")):
+            self.assertEqual(pipeline._instruction_language(text, fallback), expected, text)
+
+    def test_language_request_keeps_the_previous_format_instruction(self):
+        history = [pipeline.Turn("user", "¿Qué es lo más importante de la Constitución argentina?"), pipeline.Turn("assistant", "Es federal [1]"),
+                   pipeline.Turn("user", "Just leave me the most important part."), pipeline.Turn("assistant", "Federal [1]")]
+        with patch("chat.pipeline.route", return_value=("consulta", "q", "q")) as router, \
+             patch("chat.pipeline.retrieval.search", return_value=[HIT]), \
+             patch("chat.pipeline.stream_answer", return_value=iter(["Federal republic [1]"])) as answer:
+            events = list(pipeline.run("ponlo en ingles a eso", "A", history, "es"))
+        self.assertEqual(router.call_args.args[0], "¿Qué es lo más importante de la Constitución argentina?")
+        self.assertEqual((answer.call_args.args[1], answer.call_args.kwargs["style"]), ("en", "brief"))
+        self.assertEqual(events[-1]["status"], "answer")
+
+    def test_refusal_with_identify_is_detected(self):
+        self.assertTrue(pipeline.looks_like_refusal('The provided sources do not identify a single "most important" part.'))
+
+
+class TranslatePreviousAnswerTests(SimpleTestCase):
+    CITES = [{"number": 2, "chunk_id": 1, "title": "Constitución", "page": 5, "similarity": 0.6, "quote": "q"},
+             {"number": 5, "chunk_id": 1, "title": "Normas", "page": 3, "similarity": 0.65, "quote": "q"}]
+
+    def _history(self):
+        return [pipeline.Turn("user", "Necesito saber sobre la Constitución Argentina."), pipeline.Turn("assistant", "Es federal [2]", self.CITES[:1]),
+                pipeline.Turn("user", "puedes darme lo mas importante"),
+                pipeline.Turn("assistant", "- Es una república federal [2].\n- Protege la prensa [5].", self.CITES)]
+
+    def test_language_request_translates_the_last_answer_with_its_citations(self):
+        with patch("chat.pipeline.translate_answer", return_value="- It is a federal republic [2].\n- It protects the press [5].") as translate, \
+             patch("chat.pipeline.route") as router:
+            events = list(pipeline.run("ahora en ingles", "A", self._history(), "es"))
+        final = events[-1]
+        self.assertEqual((final["status"], final["language"]), ("answer", "en"))
+        self.assertEqual([c["number"] for c in final["citations"]], [2, 5])
+        self.assertIn("- Es una república federal [2].", translate.call_args.args[0])  # traduce lo último que se ve
+        router.assert_not_called()
+
+    def test_unreliable_translation_falls_back_to_answering_again(self):
+        with patch("chat.pipeline.translate_answer", return_value="Sin citas en español"), \
+             patch("chat.pipeline.route", return_value=("consulta", "q", "q")) as router, \
+             patch("chat.pipeline.retrieval.search", return_value=[HIT]), \
+             patch("chat.pipeline.stream_answer", return_value=iter(["A federal republic [1]"])):
+            events = list(pipeline.run("ahora en ingles", "A", self._history(), "es"))
+        router.assert_called()
+        self.assertEqual(events[-1]["status"], "answer")

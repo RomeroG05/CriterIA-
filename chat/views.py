@@ -26,6 +26,9 @@ log = logging.getLogger(__name__)
 MAX_MESSAGE = 2000
 MAX_AUDIO_BYTES = 15 * 1024 * 1024
 S = Message.Status
+# Turnos recientes que llegan al flujo. El modelo solo usa los últimos para entender un seguimiento; el resto
+# sirve para encontrar la pregunta original tras una cadena de pedidos («en inglés», «más simple», «en español»…).
+HISTORY_TURNS = 20
 
 
 def _allowed(request, scope: str, limit: int, window: int = 600) -> bool:
@@ -204,20 +207,36 @@ def _parse_guest_history(raw) -> list[pipeline.Turn]:
     """El invitado envía su contexto reciente: en el servidor no se guarda nada suyo."""
     turns = []
     if isinstance(raw, list):
-        for item in raw[-4:]:
+        for item in raw[-HISTORY_TURNS:]:
             if isinstance(item, dict) and item.get("role") in {"user", "assistant"} and isinstance(item.get("content"), str):
-                turns.append(pipeline.Turn(item["role"], item["content"][:1500]))
+                turns.append(pipeline.Turn(item["role"], item["content"][:4000], _guest_citations(item.get("citations"))))
     return turns
 
 
+def _guest_citations(raw) -> list[dict]:
+    """Fuentes de una respuesta anterior del invitado, saneadas: solo sirven para volver a mostrarlas."""
+    citations = []
+    for item in raw[:12] if isinstance(raw, list) else []:
+        try:
+            number, page = int(item["number"]), int(item["page"])
+            chunk = item.get("chunk_id")
+            citations.append({"number": number, "chunk_id": int(chunk) if chunk is not None else None, "title": str(item["title"])[:300],
+                              "page": page, "similarity": float(item.get("similarity", 0)), "quote": str(item.get("quote", ""))[:400]})
+        except (KeyError, TypeError, ValueError):
+            continue
+    return [c for c in citations if 1 <= c["number"] <= 20]
+
+
 def _user_history(conversation: Conversation) -> list[pipeline.Turn]:
-    rows = list(conversation.messages.order_by("-created_at", "-id")[:8])[::-1]
+    rows = list(conversation.messages.prefetch_related("citations").order_by("-created_at", "-id")[:HISTORY_TURNS * 2])[::-1]
     turns, pending = [], None
     for row in rows:  # solo pares con respuesta fundamentada aportan contexto útil
         if row.role == "user":
             pending = row
         elif pending is not None and row.status == S.ANSWER:
-            turns += [pipeline.Turn("user", pending.content), pipeline.Turn("assistant", row.content)]
+            citations = [{"number": c.number, "chunk_id": c.chunk_id, "title": c.title, "page": c.page, "similarity": c.similarity, "quote": c.quote}
+                         for c in row.citations.all()]
+            turns += [pipeline.Turn("user", pending.content), pipeline.Turn("assistant", row.content, citations)]
             pending = None
     return turns
 

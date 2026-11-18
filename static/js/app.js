@@ -392,8 +392,8 @@
           if (raf) cancelAnimationFrame(raf);
           renderFinal(view, { ...event, id: event.message_id });
           if (!boot.authenticated && event.status === "answer") {
-            state.guestHistory.push({ role: "user", content: text }, { role: "assistant", content: event.content });
-            state.guestHistory = state.guestHistory.slice(-4);
+            state.guestHistory.push({ role: "user", content: text }, { role: "assistant", content: event.content, citations: event.citations });
+            state.guestHistory = state.guestHistory.slice(-20); // el servidor busca ahí la pregunta original
           }
           break;
         case "error":

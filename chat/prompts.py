@@ -25,7 +25,7 @@ Return JSON with:
   - "consulta": a question or situation within the domain, or a follow-up to the conversation.
   - "ambigua": too vague to know what is being asked, even considering the conversation.
   - "fuera_de_dominio": clearly about something else (recipes, sports, programming help, general trivia, other school subjects).
-  - "sobre_asistente": asks who the assistant is or what it can do.
+  - "sobre_asistente": asks who the assistant is, what it can do or how it works. If there is a conversation and the message asks about its topic (even with "you", like "what should I know?" or "what else can you tell me?"), it is "consulta", not "sobre_asistente".
 - standalone_query: the message rewritten so it can be understood alone, resolving words like "that" or "the previous case" from the conversation. Keep the user's language. Never answer it.
 - spanish_query: standalone_query translated into Spanish (copy it if it is already Spanish). It is used to search Spanish documents.
 
@@ -40,6 +40,8 @@ Examples:
 "¿Debo avisar si usé IA en una nota?" -> consulta
 "What did that newspaper's ethics report say about cameras?" -> consulta
 "y sus consecuencias?" after a conversation about deepfakes -> consulta, standalone_query "¿Cuáles son las consecuencias de los deepfakes?"
+"¿Qué es lo más importante que deberías saber?" after a conversation about the Argentine Constitution -> consulta, standalone_query "¿Qué es lo más importante de la Constitución argentina?"
+"tell me more" after a conversation about press freedom -> consulta, standalone_query "Tell me more about press freedom"
 """
 
 _RULES = """You are {assistant}, an academic assistant on ethical dilemmas in artificial intelligence, communication and journalism.
@@ -106,11 +108,35 @@ VOICE_STYLE = (
 )
 
 
-def answer_system(mode: str, language: str, voice: bool = False) -> str:
-    style = "Be brief and conversational. Plain text only." if voice else "Be concise. Use Markdown."
-    rules = _RULES.format(assistant=settings.ASSISTANT_NAME, language=LANGUAGE_NAME[language], sentinel=NO_EVIDENCE, style=style)
+# Instrucciones del usuario sobre cómo quiere la respuesta («solo lo más importante», «más simple»…).
+# Sustituyen el formato fijo del modo, pero no las reglas: todo sigue saliendo de las fuentes y citado.
+_TASK = {
+    "A": "Task: explain the concept the user asks about.",
+    "B": "Task: present the real cases described in the sources.",
+    "C": "Task: analyze the ethical dilemma without deciding it for the user.",
+}
+STYLES = {
+    "brief": "The user asked for only the most important points: give at most three short bullet points (or three sentences) "
+             "with the essentials, and leave out secondary details.",
+    "simple": "The user asked for a simpler explanation: use everyday words and short sentences, avoid jargon or explain it "
+              "in plain words, in at most five sentences or bullet points.",
+    "detail": "The user asked for more detail: cover every relevant point the sources contain, organized under short headings.",
+    "examples": "The user asked for examples: give one to three concrete examples taken from the sources (a case, a situation "
+                "or a specific provision such as an article), each in one or two sentences. Do not give a general overview. "
+                f"If the sources contain nothing concrete, reply {NO_EVIDENCE}.",
+    "list": "Present the answer as a bulleted list of short points.",
+}
+_VOICE_STYLES = {"brief", "simple", "examples"}  # en voz no hay listas ni títulos
+
+
+def answer_system(mode: str, language: str, voice: bool = False, style: str | None = None) -> str:
+    tone = "Be brief and conversational. Plain text only." if voice else "Be concise. Use Markdown."
+    rules = _RULES.format(assistant=settings.ASSISTANT_NAME, language=LANGUAGE_NAME[language], sentinel=NO_EVIDENCE, style=tone)
     if voice:
-        return f"{rules}\n{_VOICE_TASK[mode]}\n{VOICE_STYLE}"
+        extra = f"\n{STYLES[style]}" if style in _VOICE_STYLES else ""
+        return f"{rules}\n{_VOICE_TASK[mode]}\n{VOICE_STYLE}{extra}"
+    if style in STYLES:
+        return f"{rules}\n{_TASK[mode]}\n{STYLES[style]}"
     return f"{rules}\n{_format(mode, language)}"
 
 
@@ -119,10 +145,12 @@ Keep the Markdown structure and every citation marker such as [2] exactly where 
 Do not add, remove or change any information. Output only the translation."""
 
 
-def answer_user(question: str, numbered_sources: list[tuple[int, str, int, str]], language: str) -> str:
+def answer_user(question: str, numbered_sources: list[tuple[int, str, int, str]], language: str, style: str | None = None) -> str:
     sources = "\n\n".join(
         f'<source number="{number}" document="{title}" page="{page}">\n{text}\n</source>'
         for number, title, page, text in numbered_sources
     )
     # El idioma se repite al final: un modelo pequeño obedece más la última instrucción que la del sistema.
-    return f"<sources>\n{sources}\n</sources>\n\nUser request: {question}\n\nWrite the whole answer in {LANGUAGE_NAME[language]}."
+    # La instrucción del usuario también va al final; al cambiar el formato, el modelo tiende a olvidar las citas.
+    how = f"\n\n{STYLES[style]} Keep the source number in square brackets, like [2], after each statement." if style in STYLES else ""
+    return f"<sources>\n{sources}\n</sources>\n\nUser request: {question}{how}\n\nWrite the whole answer in {LANGUAGE_NAME[language]}."
